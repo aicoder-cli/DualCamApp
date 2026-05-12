@@ -44,7 +44,10 @@ class CameraManager: NSObject, ObservableObject {
     private var backCamera: CameraConfiguration!
     
     private let videoDataOutputQueue = DispatchQueue(label: "com.dualcamera.videoOutput", qos: .userInteractive)
-    private let audioSession = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInMicrophone], mediaType: .audio, position: .unspecified)
+    
+    // nonisolated 引用：供 delegate 回调中使用，避免跨 Actor 访问
+    nonisolated(unsafe) private var _frontVideoOutput: AVCaptureVideoDataOutput?
+    nonisolated(unsafe) private var _backVideoOutput: AVCaptureVideoDataOutput?
     
     // 视频帧回调
     var frontVideoFrameHandler: ((CMSampleBuffer) -> Void)?
@@ -164,7 +167,6 @@ class CameraManager: NSObject, ObservableObject {
             frontSession.beginConfiguration()
             frontSession.sessionPreset = .high
             
-            // 获取前置摄像头设备
             guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
                 errorMessage = "无法找到前置摄像头"
                 return
@@ -172,7 +174,6 @@ class CameraManager: NSObject, ObservableObject {
             
             frontCamera.device = device
             
-            // 创建输入
             let input = try AVCaptureDeviceInput(device: device)
             frontCamera.input = input
             
@@ -180,7 +181,6 @@ class CameraManager: NSObject, ObservableObject {
                 frontSession.addInput(input)
             }
             
-            // 创建视频输出
             let videoOutput = AVCaptureVideoDataOutput()
             videoOutput.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
             videoOutput.alwaysDiscardsLateVideoFrames = true
@@ -189,12 +189,12 @@ class CameraManager: NSObject, ObservableObject {
             ]
             
             frontCamera.output = videoOutput
+            _frontVideoOutput = videoOutput  // 保存 nonisolated 引用
             
             if frontSession.canAddOutput(videoOutput) {
                 frontSession.addOutput(videoOutput)
             }
             
-            // 设置连接
             if let connection = videoOutput.connection(with: .video) {
                 frontCamera.connection = connection
                 if connection.isVideoMirroringSupported {
@@ -217,7 +217,6 @@ class CameraManager: NSObject, ObservableObject {
             backSession.beginConfiguration()
             backSession.sessionPreset = .high
             
-            // 获取后置摄像头设备
             guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
                 errorMessage = "无法找到后置摄像头"
                 return
@@ -225,7 +224,6 @@ class CameraManager: NSObject, ObservableObject {
             
             backCamera.device = device
             
-            // 创建输入
             let input = try AVCaptureDeviceInput(device: device)
             backCamera.input = input
             
@@ -233,7 +231,6 @@ class CameraManager: NSObject, ObservableObject {
                 backSession.addInput(input)
             }
             
-            // 创建视频输出
             let videoOutput = AVCaptureVideoDataOutput()
             videoOutput.setSampleBufferDelegate(self, queue: videoDataOutputQueue)
             videoOutput.alwaysDiscardsLateVideoFrames = true
@@ -242,12 +239,12 @@ class CameraManager: NSObject, ObservableObject {
             ]
             
             backCamera.output = videoOutput
+            _backVideoOutput = videoOutput  // 保存 nonisolated 引用
             
             if backSession.canAddOutput(videoOutput) {
                 backSession.addOutput(videoOutput)
             }
             
-            // 设置连接
             if let connection = videoOutput.connection(with: .video) {
                 backCamera.connection = connection
             }
@@ -276,7 +273,6 @@ class CameraManager: NSObject, ObservableObject {
     
     /// 切换前后摄像头
     func switchCameras() {
-        // 交换预览层的session
         let tempSession = frontCamera.previewLayer.session
         frontCamera.previewLayer.session = backCamera.previewLayer.session
         backCamera.previewLayer.session = tempSession
@@ -347,18 +343,17 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         
-        // 保存输出引用用于比较
-        let frontOutputRef: AVCaptureVideoDataOutput? = frontCamera?.output
-        let backOutputRef: AVCaptureVideoDataOutput? = backCamera?.output
+        // 使用 nonisolated 引用进行比较，避免跨 Actor 访问
+        let frontRef = _frontVideoOutput
+        let backRef = _backVideoOutput
         
-        // 判断是哪个摄像头的输出
-        if output === frontOutputRef {
-            Task { @MainActor in
-                frontVideoFrameHandler?(sampleBuffer)
+        if output === frontRef {
+            Task { @MainActor [weak self] in
+                self?.frontVideoFrameHandler?(sampleBuffer)
             }
-        } else if output === backOutputRef {
-            Task { @MainActor in
-                backVideoFrameHandler?(sampleBuffer)
+        } else if output === backRef {
+            Task { @MainActor [weak self] in
+                self?.backVideoFrameHandler?(sampleBuffer)
             }
         }
     }
