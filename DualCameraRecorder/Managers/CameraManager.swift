@@ -300,19 +300,19 @@ class CameraManager: NSObject, ObservableObject {
     /// 设置对焦点
     func setFocusPoint(_ point: CGPoint, for cameraType: CameraType) {
         let camera = cameraType == .front ? frontCamera : backCamera
-        guard let device = camera.device else { return }
+        guard let camera = camera, let device = camera.device else { return }
         
         do {
             try device.lockForConfiguration()
             
             if device.isFocusPointOfInterestSupported {
                 device.focusPointOfInterest = point
-                device.focusMode = .autoFocus
+                device.focusMode = .continuousAutoFocus
             }
             
             if device.isExposurePointOfInterestSupported {
                 device.exposurePointOfInterest = point
-                device.exposureMode = .autoExpose
+                device.exposureMode = .continuousAutoExposure
             }
             
             device.unlockForConfiguration()
@@ -347,11 +347,19 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         
+        // 保存输出引用用于比较
+        let frontOutputRef: AVCaptureVideoDataOutput? = frontCamera?.output
+        let backOutputRef: AVCaptureVideoDataOutput? = backCamera?.output
+        
         // 判断是哪个摄像头的输出
-        if output === frontCamera.output {
-            frontVideoFrameHandler?(sampleBuffer)
-        } else if output === backCamera.output {
-            backVideoFrameHandler?(sampleBuffer)
+        if output === frontOutputRef {
+            Task { @MainActor in
+                frontVideoFrameHandler?(sampleBuffer)
+            }
+        } else if output === backOutputRef {
+            Task { @MainActor in
+                backVideoFrameHandler?(sampleBuffer)
+            }
         }
     }
 }
