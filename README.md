@@ -1,104 +1,130 @@
-# DualCameraRecorder - 双摄像头录像应用
+# 双摄录像
 
-一个支持同时调用前后摄像头进行录像的iOS应用，支持自定义布局。
+<p align="center">
+  <img src="promo-preview.gif" width="300" alt="App Preview">
+</p>
 
-## 功能特性
+<p align="center">
+  <strong>iOS 双摄像头录像应用</strong><br>
+  同时调用前后摄像头 · 6种布局模式 · 一键录制
+</p>
 
-### 📹 双摄像头录像
-- 同时调用前置和后置摄像头
-- 实时预览两个摄像头画面
-- 支持录制时切换布局
+<p align="center">
+  <a href="#功能特性">功能特性</a> •
+  <a href="#系统要求">系统要求</a> •
+  <a href="#安装使用">安装使用</a> •
+  <a href="#技术架构">技术架构</a>
+</p>
 
-### 🎨 自定义布局
-- **画中画模式**：后置摄像头全屏，前置摄像头小窗口
-- **左右分屏**：前后摄像头各占一半屏幕
-- **上下分屏**：后置在上，前置在下
-- **对角布局**：前后摄像头对角显示
-- **后置主屏**：后置摄像头全屏，前置小窗口
-- **前置主屏**：前置摄像头全屏，后置小窗口
+---
 
-### 🖐️ 交互功能
-- 支持拖拽调整小窗口位置
-- 录制中可实时切换布局
-- 支持缩放后置摄像头
-- 支持闪光灯控制
+## ✨ 功能特性
 
-## 系统要求
+| 特性 | 说明 |
+|------|------|
+| 📹 **双摄像头同步** | 同时录制前置和后置摄像头画面 |
+| 🎨 **6种布局模式** | 画中画 / 左右分屏 / 上下分屏 / 对角 / 后置主屏 / 前置主屏 |
+| ✋ **自由拖拽** | 前置摄像头窗口可任意调整位置 |
+| ⚡ **录制中切换** | 录制过程中实时切换布局，不中断录制 |
+| 💾 **自动保存** | 录制完成自动保存到系统相册 |
 
-- iOS 15.0+
-- Xcode 15.0+
-- Swift 5.0+
-- 支持多摄像头的iOS设备（iPhone 7及以上）
+## 📱 系统要求
 
-## 项目结构
+- **iOS**: 15.0+
+- **设备**: iPhone（多摄像头功能需真机）
+- **Xcode**: 15.0+
+
+## 🚀 安装使用
+
+### 方式一：Xcode 编译（推荐）
+
+```bash
+# 克隆仓库
+git clone https://github.com/aicoder-cli/DualCameraRecorder.git
+cd DualCameraRecorder
+
+# 用 Xcode 打开
+open DualCameraRecorder.xcodeproj
+```
+
+1. 在 Xcode 中选择你的 **Apple Developer Team**
+2. 连接 iPhone 真机
+3. 点击 **Build & Run** (⌘R)
+
+### 方式二：TestFlight（即将上线）
+
+等待 TestFlight 公测版本发布...
+
+## 🎮 使用指南
+
+### 基本录制流程
+
+1. **选择布局** - 点击底部工具栏选择喜欢的布局模式
+2. **调整位置** - 拖拽前置摄像头窗口到合适位置
+3. **开始录制** - 点击红色录制按钮
+4. **结束录制** - 再次点击按钮，视频自动保存到相册
+
+### 布局模式说明
+
+| 布局 | 预览 |
+|------|------|
+| **画中画** | 后置全屏，前置小窗 |
+| **左右分屏** | 前后各占一半 |
+| **上下分屏** | 后置在上，前置在下 |
+| **对角** | 前后对角排列 |
+| **后置主屏** | 后置全屏，前置小窗 |
+| **前置主屏** | 前置全屏，后置小窗 |
+
+## 🏗 技术架构
 
 ```
 DualCameraRecorder/
-├── DualCameraRecorder.xcodeproj/    # Xcode项目文件
-├── DualCameraRecorder/
-│   ├── App/
-│   │   └── DualCameraRecorderApp.swift    # 应用入口
-│   ├── Managers/
-│   │   ├── CameraManager.swift     # 多摄像头管理器
-│   │   ├── VideoRecorder.swift     # 视频录制引擎
-│   │   └── LayoutManager.swift     # 布局管理器
-│   ├── Views/
-│   │   ├── ContentView.swift       # 主视图
-│   │   ├── CameraPreviewView.swift # 摄像头预览视图
-│   │   └── LayoutSelectorView.swift # 布局选择器
-│   ├── Resources/
-│   │   └── Assets.xcassets/        # 资源文件
-│   └── Info.plist                  # 应用配置
-└── README.md
+├── App/                          # 应用入口
+│   └── DualCameraRecorderApp.swift
+├── Managers/                     # 核心管理器
+│   ├── CameraManager.swift       # 双摄像头管理
+│   ├── VideoRecorder.swift       # 视频录制引擎
+│   └── LayoutManager.swift       # 布局系统
+├── Views/                        # UI 视图
+│   ├── ContentView.swift         # 主界面
+│   ├── CameraPreviewView.swift   # 摄像头预览
+│   └── LayoutSelectorView.swift  # 布局选择器
+└── Resources/                    # 资源文件
+    └── Assets.xcassets/
 ```
 
-## 核心模块说明
+### 核心技术
 
-### CameraManager
-负责管理前后摄像头会话：
-- 初始化和配置AVCaptureSession
-- 处理摄像头权限请求
-- 提供预览层
-- 管理摄像头控制（缩放、对焦、闪光灯）
+- **SwiftUI** - 声明式 UI 框架
+- **AVFoundation** - 摄像头和录制引擎
+- **AVCaptureMultiCamSession** - 多摄像头同步捕获
+- **AVAssetWriter** - 视频合成与导出
 
-### LayoutManager
-负责管理双摄像头画面布局：
-- 提供6种预设布局模板
-- 支持自定义偏移和缩放
-- 计算每个摄像头的布局信息
+## 📸 截图预览
 
-### VideoRecorder
-负责视频录制和合成：
-- 使用AVAssetWriter进行视频写入
-- 实时合成双摄像头画面
-- 根据布局类型生成最终视频
-- 自动保存到相册
+<p align="center">
+  <img src="promo-preview.gif" width="250" />
+</p>
 
-## 使用方法
+## 📝 更新日志
 
-1. 用Xcode打开 `DualCameraRecorder.xcodeproj`
-2. 选择目标设备或模拟器
-3. 点击运行按钮启动应用
-4. 授权摄像头和麦克风权限
-5. 选择喜欢的布局模式
-6. 点击录制按钮开始录制
-7. 再次点击停止录制，视频自动保存到相册
+### v1.0.0
+- ✅ 双摄像头同步录制
+- ✅ 6种布局模式
+- ✅ 自由拖拽调整
+- ✅ 录制中切换布局
+- ✅ 清新毛玻璃 UI
 
-## 注意事项
+## 🤝 贡献
 
-- 多摄像头功能需要真机测试，模拟器不支持
-- 首次使用需要授权摄像头、麦克风和相册权限
-- 录制时建议使用画中画或分屏模式以获得最佳效果
-- 视频分辨率为1080p (1920x1080)
+欢迎提交 Issue 和 Pull Request！
 
-## 技术栈
-
-- **UI框架**: SwiftUI
-- **摄像头**: AVFoundation (AVCaptureSession)
-- **视频录制**: AVAssetWriter
-- **布局**: 自定义布局管理器
-- **最低支持版本**: iOS 15.0
-
-## License
+## 📄 许可
 
 MIT License
+
+---
+
+<p align="center">
+  Made with ❤️ by AI Coder
+</p>
