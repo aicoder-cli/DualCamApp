@@ -6,6 +6,7 @@
 "capture.video" = "视频";
 "status.ready" = "就绪";
 "status.starting" = "启动中";
+"status.recording" = "录制中";
 "status.readyValue" = "就绪";
 "status.notReady" = "未就绪";
 

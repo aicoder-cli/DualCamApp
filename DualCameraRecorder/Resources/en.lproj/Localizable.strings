@@ -6,6 +6,7 @@
 "capture.video" = "Video";
 "status.ready" = "READY";
 "status.starting" = "STARTING";
+"status.recording" = "REC";
 "status.readyValue" = "Ready";
 "status.notReady" = "Not Ready";
 

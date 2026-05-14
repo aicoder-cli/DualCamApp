@@ -86,8 +86,8 @@ struct ContentView: View {
                 VStack(spacing: 18) {
                     DemoHeader(
                         isReady: cameraManager.isSessionRunning,
+                        isRecording: videoRecorder.recordingState == .recording,
                         captureMode: $captureMode,
-                        isLivePhotoEnabled: $isLivePhotoEnabled,
                         showSettings: $showSettings
                     )
                     .padding(.horizontal, 20)
@@ -259,6 +259,13 @@ struct ContentView: View {
                     .foregroundColor(.white.opacity(0.84))
             }
             .padding(18)
+
+            if captureMode == .photo {
+                LivePhotoToggle(isEnabled: $isLivePhotoEnabled)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing)))
+            }
         }
         .frame(height: previewHeight)
         .padding(.horizontal, 18)
@@ -326,40 +333,42 @@ struct ContentView: View {
 
 private struct DemoHeader: View {
     let isReady: Bool
+    let isRecording: Bool
     @Binding var captureMode: CaptureMode
-    @Binding var isLivePhotoEnabled: Bool
     @Binding var showSettings: Bool
+
+    private var statusKey: LocalizedStringKey {
+        if isRecording { return "status.recording" }
+        return isReady ? "status.ready" : "status.starting"
+    }
+
+    private var statusColor: Color {
+        if isRecording { return Design.recordRed }
+        return isReady ? Design.accent : Color.orange
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("DualCam")
-                    .font(.system(size: 32, weight: .black, design: .rounded))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundColor(.white)
 
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(isReady ? Design.accent : Color.orange)
-                        .frame(width: 8, height: 8)
-                    Text(LocalizedStringKey(isReady ? "status.ready" : "status.starting"))
-                        .font(.system(size: 11, weight: .black))
-                        .foregroundColor(isReady ? Design.accent : Color.orange)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.white.opacity(0.08)))
+                Text(statusKey)
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.3)
+                    .foregroundColor(statusColor)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(statusColor.opacity(0.14))
+                    )
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 8) {
-                ModeSegmentedControl(selection: $captureMode)
-
-                if captureMode == .photo {
-                    LivePhotoToggle(isEnabled: $isLivePhotoEnabled)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-            }
+            ModeSegmentedControl(selection: $captureMode)
 
             Button(action: { showSettings = true }) {
                 Image(systemName: "gearshape.fill")
@@ -382,18 +391,22 @@ private struct LivePhotoToggle: View {
                 isEnabled.toggle()
             }
         }) {
-            HStack(spacing: 6) {
-                Image(systemName: isEnabled ? "livephoto" : "livephoto.slash")
-                    .font(.system(size: 12, weight: .bold))
-                Text("livePhoto.badge")
-                    .font(.system(size: 11, weight: .black))
-            }
-            .foregroundColor(isEnabled ? .black : .white.opacity(0.68))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Capsule().fill(isEnabled ? Design.accent : Color.white.opacity(0.08)))
-            .overlay(Capsule().stroke(Design.panelStroke, lineWidth: 0.8))
+            Image(systemName: isEnabled ? "livephoto" : "livephoto.slash")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(isEnabled ? Design.accent : .white.opacity(0.46))
+                .frame(width: 36, height: 36)
+                .background(
+                    Circle()
+                        .fill(isEnabled ? Color(red: 0.07, green: 0.09, blue: 0.04).opacity(0.76) : Color.black.opacity(0.34))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(isEnabled ? Design.accent.opacity(0.5) : Color.white.opacity(0.14), lineWidth: 1)
+                )
+                .shadow(color: isEnabled ? Design.accent.opacity(0.14) : .clear, radius: 22, x: 0, y: 0)
         }
+        .accessibilityLabel(Text("livePhoto.title"))
+        .accessibilityValue(Text(isEnabled ? "status.readyValue" : "status.notReady"))
     }
 }
 
