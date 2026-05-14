@@ -20,11 +20,27 @@
 		A1111111000000000000000B /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000B /* AppLanguage.swift */; };
 		A1111111000000000000000C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000E /* Localizable.strings */; };
 		A1111111000000000000000D /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000012 /* InfoPlist.strings */; };
-			A1111111000000000000000E /* WorksManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000013 /* WorksManager.swift */; };
-			A1111111000000000000000F /* WorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000014 /* WorksView.swift */; };
-			A11111110000000000000010 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000015 /* AppSettings.swift */; };
-			A11111110000000000000011 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000016 /* SettingsView.swift */; };
+		A1111111000000000000000E /* WorksManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000013 /* WorksManager.swift */; };
+		A1111111000000000000000F /* WorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000014 /* WorksView.swift */; };
+		A11111110000000000000010 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000015 /* AppSettings.swift */; };
+		A11111110000000000000011 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000016 /* SettingsView.swift */; };
+		A11111110000000000000012 /* WorksPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000017 /* WorksPresentation.swift */; };
+		A11111110000000000000020 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000021 /* TestSupport.swift */; };
+		A11111110000000000000021 /* LayoutManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000022 /* LayoutManagerTests.swift */; };
+		A11111110000000000000022 /* AppSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000023 /* AppSettingsTests.swift */; };
+		A11111110000000000000023 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000024 /* LocalizationTests.swift */; };
+		A11111110000000000000024 /* WorksPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000025 /* WorksPresentationTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A19999990000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A17777770000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A15555550000000000000001;
+			remoteInfo = DualCameraRecorder;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A12222220000000000000000 /* DualCameraRecorder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DualCameraRecorder.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -44,14 +60,29 @@
 		A1222222000000000000000F /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A12222220000000000000010 /* LivePhotoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoRecorder.swift; sourceTree = "<group>"; };
 		A12222220000000000000011 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
-			A12222220000000000000013 /* WorksManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksManager.swift; sourceTree = "<group>"; };
-			A12222220000000000000014 /* WorksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksView.swift; sourceTree = "<group>"; };
-			A12222220000000000000015 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
-			A12222220000000000000016 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A12222220000000000000013 /* WorksManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksManager.swift; sourceTree = "<group>"; };
+		A12222220000000000000014 /* WorksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksView.swift; sourceTree = "<group>"; };
+		A12222220000000000000015 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		A12222220000000000000016 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A12222220000000000000017 /* WorksPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksPresentation.swift; sourceTree = "<group>"; };
+		A12222220000000000000020 /* DualCameraRecorderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DualCameraRecorderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A12222220000000000000021 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
+		A12222220000000000000022 /* LayoutManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutManagerTests.swift; sourceTree = "<group>"; };
+		A12222220000000000000023 /* AppSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsTests.swift; sourceTree = "<group>"; };
+		A12222220000000000000024 /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
+		A12222220000000000000025 /* WorksPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksPresentationTests.swift; sourceTree = "<group>"; };
+		A12222220000000000000027 /* DualCameraRecorder.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = DualCameraRecorder.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A13333330000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A13333330000000000000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -65,6 +96,8 @@
 			isa = PBXGroup;
 			children = (
 				A14444440000000000000002 /* DualCameraRecorder */,
+				A14444440000000000000008 /* DualCameraRecorderTests */,
+				A12222220000000000000027 /* DualCameraRecorder.xctestplan */,
 				A14444440000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -85,6 +118,7 @@
 			isa = PBXGroup;
 			children = (
 				A12222220000000000000000 /* DualCameraRecorder.app */,
+				A12222220000000000000020 /* DualCameraRecorderTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -107,6 +141,7 @@
 				A12222220000000000000005 /* LayoutManager.swift */,
 				A12222220000000000000010 /* LivePhotoRecorder.swift */,
 				A12222220000000000000013 /* WorksManager.swift */,
+				A12222220000000000000017 /* WorksPresentation.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -134,6 +169,18 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		A14444440000000000000008 /* DualCameraRecorderTests */ = {
+			isa = PBXGroup;
+			children = (
+				A12222220000000000000021 /* TestSupport.swift */,
+				A12222220000000000000022 /* LayoutManagerTests.swift */,
+				A12222220000000000000023 /* AppSettingsTests.swift */,
+				A12222220000000000000024 /* LocalizationTests.swift */,
+				A12222220000000000000025 /* WorksPresentationTests.swift */,
+			);
+			path = DualCameraRecorderTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -154,6 +201,24 @@
 			productReference = A12222220000000000000000 /* DualCameraRecorder.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A15555550000000000000004 /* DualCameraRecorderTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A16666660000000000000004 /* Build configuration list for PBXNativeTarget "DualCameraRecorderTests" */;
+			buildPhases = (
+				A15555550000000000000005 /* Sources */,
+				A13333330000000000000002 /* Frameworks */,
+				A15555550000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A15555550000000000000007 /* PBXTargetDependency */,
+			);
+			name = DualCameraRecorderTests;
+			productName = DualCameraRecorderTests;
+			productReference = A12222220000000000000020 /* DualCameraRecorderTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -166,6 +231,10 @@
 				TargetAttributes = {
 					A15555550000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					A15555550000000000000004 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = A15555550000000000000001;
 					};
 				};
 			};
@@ -184,6 +253,7 @@
 			projectRoot = "";
 			targets = (
 				A15555550000000000000001 /* DualCameraRecorder */,
+				A15555550000000000000004 /* DualCameraRecorderTests */,
 			);
 		};
 /* End PBXProject section */
@@ -196,6 +266,13 @@
 				A11111110000000000000008 /* Assets.xcassets in Resources */,
 				A1111111000000000000000C /* Localizable.strings in Resources */,
 				A1111111000000000000000D /* InfoPlist.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A15555550000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -220,10 +297,31 @@
 				A1111111000000000000000F /* WorksView.swift in Sources */,
 				A11111110000000000000010 /* AppSettings.swift in Sources */,
 				A11111110000000000000011 /* SettingsView.swift in Sources */,
+				A11111110000000000000012 /* WorksPresentation.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A15555550000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A11111110000000000000020 /* TestSupport.swift in Sources */,
+				A11111110000000000000021 /* LayoutManagerTests.swift in Sources */,
+				A11111110000000000000022 /* AppSettingsTests.swift in Sources */,
+				A11111110000000000000023 /* LocalizationTests.swift in Sources */,
+				A11111110000000000000024 /* WorksPresentationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A15555550000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A15555550000000000000001 /* DualCameraRecorder */;
+			targetProxy = A19999990000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		A1222222000000000000000E /* Localizable.strings */ = {
@@ -426,6 +524,54 @@
 			};
 			name = Release;
 		};
+		A18888880000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P3724G3229;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dualcamera.recorder.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DualCameraRecorder.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DualCameraRecorder";
+				WRAPPER_EXTENSION = xctest;
+			};
+			name = Debug;
+		};
+		A18888880000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P3724G3229;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dualcamera.recorder.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DualCameraRecorder.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DualCameraRecorder";
+				WRAPPER_EXTENSION = xctest;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -443,6 +589,15 @@
 			buildConfigurations = (
 				A18888880000000000000003 /* Debug */,
 				A18888880000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A16666660000000000000004 /* Build configuration list for PBXNativeTarget "DualCameraRecorderTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A18888880000000000000005 /* Debug */,
+				A18888880000000000000006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "A3F8E816-8D26-4F13-8B70-78B1C17D3B6A",
+      "name" : "Unit Tests",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:DualCameraRecorder.xcodeproj",
+        "identifier" : "A15555550000000000000004",
+        "name" : "DualCameraRecorderTests"
+      }
+    }
+  ],
+  "version" : 1
+}

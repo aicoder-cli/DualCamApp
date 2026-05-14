@@ -79,7 +79,6 @@ struct ContentView: View {
     @AppStorage(SettingsKey.lastLayout) private var lastLayoutRaw = LayoutType.pictureInPicture.rawValue
     @AppStorage(SettingsKey.immersiveRecording) private var immersiveRecording = true
     @AppStorage(SettingsKey.controlRevealSeconds) private var controlRevealSeconds = ControlRevealDuration.twoSeconds.rawValue
-    @AppStorage(SettingsKey.saveToSystemPhotos) private var saveToSystemPhotos = true
 
     private var isVideoRecording: Bool {
         captureMode == .video && videoRecorder.recordingState == .recording
@@ -145,13 +144,13 @@ struct ContentView: View {
                                     await videoRecorder.capturePhoto(
                                         livePhotoEnabled: livePhotoEnabled,
                                         livePhotoDuration: livePhotoDuration,
-                                        saveToSystemPhotos: saveToSystemPhotos
+                                        saveToSystemPhotos: false
                                     )
                                 }
                             }
                         },
                         onStopRecording: {
-                            Task<Void, Never> { await videoRecorder.stopRecording(saveToSystemPhotos: saveToSystemPhotos) }
+                            Task<Void, Never> { await videoRecorder.stopRecording(saveToSystemPhotos: false) }
                         },
                         onCustomize: {
                             withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {

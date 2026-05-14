@@ -110,7 +110,7 @@ class VideoRecorder: ObservableObject {
     
     /// 停止录制
     @MainActor
-    func stopRecording(saveToSystemPhotos: Bool = true) async {
+    func stopRecording(saveToSystemPhotos: Bool = false) async {
         guard recordingState == .recording else { return }
         
         recordingState = .stopping
@@ -412,7 +412,7 @@ class VideoRecorder: ObservableObject {
     }
 
     @MainActor
-    func capturePhoto(livePhotoEnabled: Bool, livePhotoDuration: TimeInterval = 2.5, saveToSystemPhotos: Bool = true) async {
+    func capturePhoto(livePhotoEnabled: Bool, livePhotoDuration: TimeInterval = 2.5, saveToSystemPhotos: Bool = false) async {
         guard recordingState == .idle else { return }
 
         if livePhotoEnabled {

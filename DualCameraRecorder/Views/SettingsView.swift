@@ -1,4 +1,3 @@
-import Photos
 import SwiftUI
 
 struct SettingsView: View {
@@ -17,12 +16,10 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.controlRevealSeconds) private var controlRevealSeconds = ControlRevealDuration.twoSeconds.rawValue
     @AppStorage(SettingsKey.recordingCountdownSeconds) private var recordingCountdownSeconds = RecordingCountdown.off.rawValue
     @AppStorage(SettingsKey.soundAndHapticsEnabled) private var soundAndHapticsEnabled = true
-    @AppStorage(SettingsKey.saveToSystemPhotos) private var saveToSystemPhotos = true
     @AppStorage(SettingsKey.keepOriginalStreams) private var keepOriginalStreams = false
     @AppStorage(SettingsKey.workNamingRule) private var workNamingRuleRaw = WorkNamingRule.dateLayout.rawValue
     @AppStorage(SettingsKey.autoClearCache) private var autoClearCache = false
     @Environment(\.dismiss) private var dismiss
-    @State private var showPhotoPermissionAlert = false
 
     var body: some View {
         NavigationView {
@@ -47,15 +44,6 @@ struct SettingsView: View {
                 }
             }
             .navigationBarHidden(true)
-            .alert("settings.photosPermissionDenied.title", isPresented: $showPhotoPermissionAlert) {
-                Button("settings.ok", role: .cancel) {}
-            } message: {
-                Text("settings.photosPermissionDenied.message")
-            }
-            .onChange(of: saveToSystemPhotos) { enabled in
-                guard enabled else { return }
-                Task { await validatePhotoLibraryAccess() }
-            }
         }
         .accentColor(SettingsPalette.accent)
     }
@@ -227,11 +215,12 @@ struct SettingsView: View {
 
     private var worksStorageSection: some View {
         SettingsSectionCard(titleKey: "settings.section.worksStorage") {
-            SettingsSwitchRow(
+            SettingsStaticValueRow(
                 titleKey: "settings.saveToSystemPhotos.title",
-                subtitleKey: "settings.saveToSystemPhotos.subtitle",
-                isOn: $saveToSystemPhotos
-            )
+                subtitleKey: "settings.saveToSystemPhotos.subtitle"
+            ) {
+                Text("settings.manualSaveOnly")
+            }
 
             SettingsSwitchRow(
                 titleKey: "settings.keepOriginalStreams.title",
@@ -277,20 +266,6 @@ struct SettingsView: View {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
         return "\(version) (\(build))"
-    }
-
-    @MainActor
-    private func validatePhotoLibraryAccess() async {
-        let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        let status = currentStatus == .notDetermined
-            ? await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-            : currentStatus
-
-        guard status == .authorized || status == .limited else {
-            saveToSystemPhotos = false
-            showPhotoPermissionAlert = true
-            return
-        }
     }
 }
 

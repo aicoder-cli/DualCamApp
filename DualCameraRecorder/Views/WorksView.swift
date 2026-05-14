@@ -1,4 +1,5 @@
 import AVKit
+import Photos
 import SwiftUI
 import UIKit
 
@@ -6,6 +7,9 @@ struct WorksView: View {
     @ObservedObject var manager: WorksManager
     @Environment(\.dismiss) private var dismiss
     @State private var selectedFilter: WorksFilter = .all
+    @State private var isSelecting = false
+    @State private var selectedIDs: Set<WorkItem.ID> = []
+    @State private var isDeleteConfirmationPresented = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 10),
@@ -16,9 +20,17 @@ struct WorksView: View {
         manager.filteredItems(for: selectedFilter)
     }
 
+    private var selectedCount: Int {
+        selectedIDs.count
+    }
+
+    private var canShowSelectionControls: Bool {
+        manager.readError == nil && !manager.items.isEmpty
+    }
+
     var body: some View {
         NavigationView {
-            ZStack {
+            ZStack(alignment: .bottom) {
                 WorksDesign.background.ignoresSafeArea()
 
                 VStack(alignment: .leading, spacing: 18) {
@@ -27,7 +39,14 @@ struct WorksView: View {
                     content
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 18)
+                .padding(.bottom, isSelecting ? 92 : 18)
+
+                if isSelecting {
+                    selectionActionBar
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
             .navigationBarHidden(true)
             .onAppear { manager.reload() }
@@ -35,6 +54,14 @@ struct WorksView: View {
                 Button("works.action.ok", role: .cancel) {}
             } message: {
                 Text(manager.statusMessage ?? "")
+            }
+            .alert("works.delete.confirm.title", isPresented: $isDeleteConfirmationPresented) {
+                Button("works.selection.cancel", role: .cancel) {}
+                Button("works.delete.action", role: .destructive) {
+                    performDeleteSelection()
+                }
+            } message: {
+                Text(L10n.string("works.delete.confirm.message", selectedCount))
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
@@ -61,6 +88,17 @@ struct WorksView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
                     .background(Capsule().fill(WorksDesign.accent.opacity(0.12)))
+
+                if canShowSelectionControls {
+                    Button(action: isSelecting ? exitSelectionMode : enterSelectionMode) {
+                        Text(isSelecting ? "works.selection.cancel" : "works.selection.select")
+                            .font(.system(size: 12, weight: .black))
+                            .foregroundColor(isSelecting ? .white.opacity(0.72) : .black)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(isSelecting ? Color.white.opacity(0.12) : WorksDesign.accent))
+                    }
+                }
             }
             .padding(.top, 18)
 
@@ -83,6 +121,7 @@ struct WorksView: View {
                 Button(action: {
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                         selectedFilter = filter
+                        selectedIDs.removeAll()
                     }
                 }) {
                     Text(filter.titleKey)
@@ -122,22 +161,99 @@ struct WorksView: View {
                 titleKey: "works.emptyFilter.title",
                 messageKey: "works.emptyFilter.message",
                 actionTitleKey: "works.filter.all",
-                action: { selectedFilter = .all }
+                action: {
+                    selectedFilter = .all
+                    selectedIDs.removeAll()
+                }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView(showsIndicators: false) {
                 LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(filteredItems) { item in
-                        NavigationLink(destination: WorkDetailView(item: item, manager: manager)) {
-                            WorkCard(item: item)
+                        if isSelecting {
+                            Button(action: { toggleSelection(for: item) }) {
+                                WorkCard(
+                                    item: item,
+                                    isSelected: selectedIDs.contains(item.id),
+                                    isSelecting: true
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            NavigationLink(destination: WorkDetailView(item: item, manager: manager)) {
+                                WorkCard(item: item)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.bottom, 24)
             }
         }
+    }
+
+    private var selectionActionBar: some View {
+        HStack(spacing: 12) {
+            Text(L10n.string("works.selection.count", selectedCount))
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(.white.opacity(0.78))
+
+            Spacer()
+
+            Button(action: confirmDeleteSelection) {
+                Text("works.delete.action")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundColor(selectedIDs.isEmpty ? .white.opacity(0.28) : .white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 11)
+                    .background(Capsule().fill(selectedIDs.isEmpty ? Color.white.opacity(0.06) : Color.red.opacity(0.82)))
+            }
+            .disabled(selectedIDs.isEmpty)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.black.opacity(0.78))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+        )
+    }
+
+    private func enterSelectionMode() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            isSelecting = true
+            selectedIDs.removeAll()
+        }
+    }
+
+    private func exitSelectionMode() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            isSelecting = false
+            selectedIDs.removeAll()
+        }
+    }
+
+    private func toggleSelection(for item: WorkItem) {
+        if selectedIDs.contains(item.id) {
+            selectedIDs.remove(item.id)
+        } else {
+            selectedIDs.insert(item.id)
+        }
+    }
+
+    private func confirmDeleteSelection() {
+        guard !selectedIDs.isEmpty else { return }
+        isDeleteConfirmationPresented = true
+    }
+
+    private func performDeleteSelection() {
+        let ids = selectedIDs
+        manager.deleteItems(withIDs: ids)
+        exitSelectionMode()
     }
 
     private var statusMessageBinding: Binding<Bool> {
@@ -221,6 +337,8 @@ private struct EmptyAlbumGlyph: View {
 
 private struct WorkCard: View {
     let item: WorkItem
+    var isSelected = false
+    var isSelecting = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -231,6 +349,12 @@ private struct WorkCard: View {
 
                 mediaBadge
                     .padding(10)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isSelecting {
+                    selectionBadge
+                        .padding(10)
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -262,8 +386,23 @@ private struct WorkCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.white.opacity(0.09), lineWidth: 0.8)
+                .stroke(isSelected ? WorksDesign.accent : Color.white.opacity(0.09), lineWidth: isSelected ? 1.4 : 0.8)
         )
+    }
+
+    private var selectionBadge: some View {
+        ZStack {
+            Circle()
+                .fill(isSelected ? WorksDesign.accent : Color.black.opacity(0.52))
+                .frame(width: 28, height: 28)
+                .overlay(Circle().stroke(Color.white.opacity(isSelected ? 0 : 0.55), lineWidth: 1.1))
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundColor(.black)
+            }
+        }
     }
 
     private var mediaBadge: some View {
@@ -285,6 +424,7 @@ private struct WorkDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isSharing = false
     @State private var isPlayingVideo = false
+    @State private var isSavingToPhotos = false
     @State private var detailMessage: String?
 
     var body: some View {
@@ -408,10 +548,8 @@ private struct WorkDetailView: View {
 
             DetailActionButton(titleKey: "workDetail.edit", icon: "slider.horizontal.3", isEnabled: false) {}
 
-            DetailActionButton(titleKey: "workDetail.save", icon: "checkmark.circle") {
-                detailMessage = FileManager.default.fileExists(atPath: item.assetURL.path)
-                    ? L10n.string("works.save.localSuccess")
-                    : L10n.string("error.works.fileMissing")
+            DetailActionButton(titleKey: "workDetail.save", icon: "checkmark.circle", isEnabled: !isSavingToPhotos) {
+                Task { await saveWorkToPhotoLibrary() }
             }
         }
         .padding(.top, 4)
@@ -425,6 +563,74 @@ private struct WorkDetailView: View {
             item.cameraMetadata.frameRate,
             item.workDurationText
         )
+    }
+
+    @MainActor
+    private func saveWorkToPhotoLibrary() async {
+        guard !isSavingToPhotos else { return }
+        guard FileManager.default.fileExists(atPath: item.assetURL.path) else {
+            detailMessage = L10n.string("error.works.fileMissing")
+            return
+        }
+        if let pairedVideoURL = item.pairedVideoURL,
+           !FileManager.default.fileExists(atPath: pairedVideoURL.path) {
+            detailMessage = L10n.string("error.works.fileMissing")
+            return
+        }
+
+        isSavingToPhotos = true
+        defer { isSavingToPhotos = false }
+
+        let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        let status = currentStatus == .notDetermined
+            ? await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            : currentStatus
+        guard status == .authorized || status == .limited else {
+            detailMessage = L10n.string("error.works.photoLibraryDenied")
+            return
+        }
+
+        let photoImage = item.kind == .photo && item.pairedVideoURL == nil
+            ? UIImage(contentsOfFile: item.assetURL.path)
+            : nil
+        if item.kind == .photo && item.pairedVideoURL == nil && photoImage == nil {
+            detailMessage = L10n.string("error.works.fileMissing")
+            return
+        }
+
+        do {
+            try await performPhotoLibraryChanges {
+                switch item.kind {
+                case .video:
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: item.assetURL)
+                case .photo:
+                    if let pairedVideoURL = item.pairedVideoURL {
+                        let request = PHAssetCreationRequest.forAsset()
+                        request.addResource(with: .photo, fileURL: item.assetURL, options: nil)
+                        request.addResource(with: .pairedVideo, fileURL: pairedVideoURL, options: nil)
+                    } else if let photoImage {
+                        PHAssetChangeRequest.creationRequestForAsset(from: photoImage)
+                    }
+                }
+            }
+            detailMessage = L10n.string("works.save.photosSuccess")
+        } catch {
+            detailMessage = L10n.string("error.works.exportFailed", error.localizedDescription)
+        }
+    }
+
+    private func performPhotoLibraryChanges(_ changes: @escaping () -> Void) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            PHPhotoLibrary.shared().performChanges(changes) { success, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -1))
+                }
+            }
+        }
     }
 }
 
@@ -539,47 +745,4 @@ private enum WorksDesign {
     static let background = Color(red: 0.02, green: 0.024, blue: 0.032)
     static let accent = Color(red: 0.84, green: 1.0, blue: 0.30)
     static let mutedText = Color.white.opacity(0.56)
-}
-
-private extension WorkItem {
-    var localizedLayoutTitle: String {
-        LayoutType(rawValue: layout)?.localizedTitle ?? layout
-    }
-
-    var workDurationText: String {
-        if kind == .photo {
-            return pairedVideoURL == nil ? L10n.string("works.duration.photo") : L10n.string("works.duration.livePhoto")
-        }
-
-        let totalSeconds = max(0, Int(duration ?? 0))
-        return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
-    }
-}
-
-private extension Date {
-    var workDateText: String {
-        WorkDateFormatter.shared.string(from: self)
-    }
-}
-
-private extension LayoutType {
-    var localizedTitle: String {
-        switch self {
-        case .splitVertical: return L10n.string("layout.splitVertical.title")
-        case .splitHorizontal: return L10n.string("layout.splitHorizontal.title")
-        case .pictureInPicture: return L10n.string("layout.pictureInPicture.title")
-        case .circleReaction: return L10n.string("layout.circleReaction.title")
-        case .directorStack: return L10n.string("layout.directorStack.title")
-        case .diagonalCut: return L10n.string("layout.diagonalCut.title")
-        }
-    }
-}
-
-private enum WorkDateFormatter {
-    static let shared: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter
-    }()
 }

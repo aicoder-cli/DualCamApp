@@ -173,6 +173,14 @@
 "works.defaultTitle.photo" = "DualCam 照片";
 "works.defaultTitle.livePhoto" = "DualCam Live Photo";
 "works.save.localSuccess" = "已保存到 DualCam 作品集。";
+"works.save.photosSuccess" = "已保存到系统相册。";
+"works.selection.select" = "选择";
+"works.selection.cancel" = "取消";
+"works.selection.count" = "已选择 %d 项";
+"works.delete.action" = "删除";
+"works.delete.confirm.title" = "删除所选作品？";
+"works.delete.confirm.message" = "将从本机永久删除所选的 %d 个作品。";
+"works.delete.success" = "已删除 %d 个作品。";
 
 "workDetail.title" = "预览";
 "workDetail.back.works" = "作品";
@@ -188,6 +196,7 @@
 "error.works.fileMissing" = "原始文件不存在。";
 "error.works.photoLibraryDenied" = "请在设置中允许添加作品到相册。";
 "error.works.exportFailed" = "保存到相册失败：%@";
+"error.works.deleteFailed" = "无法删除作品：%@";
 
 "settings.ok" = "好的";
 "settings.section.shootingDefaults" = "拍摄默认值";
@@ -248,8 +257,9 @@
 "settings.soundHaptics.title" = "声音与震动反馈";
 "settings.soundHaptics.subtitle" = "开始和停止拍摄时提供反馈。";
 
-"settings.saveToSystemPhotos.title" = "保存到系统相册";
-"settings.saveToSystemPhotos.subtitle" = "同时将完成的作品加入 iOS 照片图库。";
+"settings.saveToSystemPhotos.title" = "相册保存";
+"settings.saveToSystemPhotos.subtitle" = "新拍摄内容只保存到 DualCam 作品，需要时可在作品详情中点击保存加入系统相册。";
+"settings.manualSaveOnly" = "手动";
 "settings.keepOriginalStreams.title" = "保留前后摄原片";
 "settings.keepOriginalStreams.subtitle" = "会占用更多存储空间；原片导出后续接入。";
 "settings.workNamingRule.title" = "作品命名规则";

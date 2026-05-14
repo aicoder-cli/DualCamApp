@@ -90,8 +90,8 @@ final class WorksManager: ObservableObject {
         do {
             try ensureDirectories()
             var loadedItems = try loadIndex()
-            loadedItems = try repairIndex(loadedItems)
-            items = loadedItems.sorted { $0.createdAt > $1.createdAt }
+            loadedItems = try repairIndex(uniqueItems(loadedItems))
+            items = uniqueItems(loadedItems.sorted { $0.createdAt > $1.createdAt })
             try saveIndex()
             readError = nil
         } catch {
@@ -100,27 +100,41 @@ final class WorksManager: ObservableObject {
     }
 
     func filteredItems(for filter: WorksFilter) -> [WorkItem] {
-        switch filter {
-        case .all:
-            return items
-        case .video:
-            return items.filter { $0.kind == .video }
-        case .photo:
-            return items.filter { $0.kind == .photo }
-        }
+        WorksLibrary.filteredItems(items, for: filter)
     }
 
     func add(_ draft: RecordedWorkDraft) {
         do {
             try ensureDirectories()
             let item = try makeWorkItem(from: draft)
-            items.removeAll { $0.assetURL == item.assetURL }
+            let itemAssetPath = assetPath(for: item.assetURL)
+            items.removeAll { assetPath(for: $0.assetURL) == itemAssetPath }
             items.insert(item, at: 0)
-            items.sort { $0.createdAt > $1.createdAt }
+            items = uniqueItems(items.sorted { $0.createdAt > $1.createdAt })
             try saveIndex()
             readError = nil
         } catch {
             readError = L10n.string("error.works.saveFailed", error.localizedDescription)
+        }
+    }
+
+    func deleteItems(withIDs ids: Set<WorkItem.ID>) {
+        guard !ids.isEmpty else { return }
+
+        do {
+            let targets = items.filter { ids.contains($0.id) }
+            guard !targets.isEmpty else { return }
+
+            for item in targets {
+                try deleteFiles(for: item)
+            }
+
+            items.removeAll { ids.contains($0.id) }
+            try saveIndex()
+            readError = nil
+            statusMessage = L10n.string("works.delete.success", targets.count)
+        } catch {
+            statusMessage = L10n.string("error.works.deleteFailed", error.localizedDescription)
         }
     }
 
@@ -131,6 +145,21 @@ final class WorksManager: ObservableObject {
         }
 
         statusMessage = L10n.string("works.save.localSuccess")
+    }
+
+    private func deleteFiles(for item: WorkItem) throws {
+        try removeFileIfPresent(at: item.assetURL)
+        if let pairedVideoURL = item.pairedVideoURL {
+            try removeFileIfPresent(at: pairedVideoURL)
+        }
+        if let thumbnailURL = item.thumbnailURL {
+            try removeFileIfPresent(at: thumbnailURL)
+        }
+    }
+
+    private func removeFileIfPresent(at url: URL) throws {
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        try fileManager.removeItem(at: url)
     }
 
     private func ensureDirectories() throws {
@@ -150,10 +179,10 @@ final class WorksManager: ObservableObject {
 
     private func repairIndex(_ currentItems: [WorkItem]) throws -> [WorkItem] {
         var repairedItems = currentItems
-        var knownPaths = Set(currentItems.map { $0.assetURL.path })
+        var knownPaths = Set(currentItems.map { assetPath(for: $0.assetURL) })
         let urls = try fileManager.contentsOfDirectory(at: documentsDirectory, includingPropertiesForKeys: [.creationDateKey, .contentModificationDateKey])
 
-        for url in urls where shouldImport(url) && !knownPaths.contains(url.path) {
+        for url in urls where shouldImport(url) && !knownPaths.contains(assetPath(for: url)) {
             let draft = RecordedWorkDraft(
                 kind: url.pathExtension.lowercased() == "mp4" ? .video : .photo,
                 assetURL: url,
@@ -167,10 +196,19 @@ final class WorksManager: ObservableObject {
             )
             let item = try makeWorkItem(from: draft)
             repairedItems.append(item)
-            knownPaths.insert(url.path)
+            knownPaths.insert(assetPath(for: url))
         }
 
-        return repairedItems
+        return uniqueItems(repairedItems)
+    }
+
+    private func uniqueItems(_ source: [WorkItem]) -> [WorkItem] {
+        var seenAssetPaths = Set<String>()
+        return source.filter { seenAssetPaths.insert(assetPath(for: $0.assetURL)).inserted }
+    }
+
+    private func assetPath(for url: URL) -> String {
+        url.standardizedFileURL.path
     }
 
     private func shouldImport(_ url: URL) -> Bool {

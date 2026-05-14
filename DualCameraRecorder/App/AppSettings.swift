@@ -49,7 +49,7 @@ enum AppSettings {
             SettingsKey.controlRevealSeconds: ControlRevealDuration.twoSeconds.rawValue,
             SettingsKey.recordingCountdownSeconds: RecordingCountdown.off.rawValue,
             SettingsKey.soundAndHapticsEnabled: true,
-            SettingsKey.saveToSystemPhotos: true,
+            SettingsKey.saveToSystemPhotos: false,
             SettingsKey.keepOriginalStreams: false,
             SettingsKey.workNamingRule: WorkNamingRule.dateLayout.rawValue,
             SettingsKey.autoClearCache: false

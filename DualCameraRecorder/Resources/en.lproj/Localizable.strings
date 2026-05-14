@@ -173,6 +173,14 @@
 "works.defaultTitle.photo" = "DualCam Photo";
 "works.defaultTitle.livePhoto" = "DualCam Live Photo";
 "works.save.localSuccess" = "Saved in DualCam Works.";
+"works.save.photosSuccess" = "Saved to Photos.";
+"works.selection.select" = "Select";
+"works.selection.cancel" = "Cancel";
+"works.selection.count" = "%d selected";
+"works.delete.action" = "Delete";
+"works.delete.confirm.title" = "Delete selected works?";
+"works.delete.confirm.message" = "This will permanently delete %d selected works from this device.";
+"works.delete.success" = "Deleted %d works.";
 
 "workDetail.title" = "Preview";
 "workDetail.back.works" = "Works";
@@ -188,6 +196,7 @@
 "error.works.fileMissing" = "The original file is missing.";
 "error.works.photoLibraryDenied" = "Allow adding works to Photos in Settings.";
 "error.works.exportFailed" = "Unable to save to Photos: %@";
+"error.works.deleteFailed" = "Unable to delete works: %@";
 
 "settings.ok" = "OK";
 "settings.section.shootingDefaults" = "Shooting Defaults";
@@ -248,8 +257,9 @@
 "settings.soundHaptics.title" = "Sound & Haptics";
 "settings.soundHaptics.subtitle" = "Feedback for capture start and stop.";
 
-"settings.saveToSystemPhotos.title" = "Save to System Photos";
-"settings.saveToSystemPhotos.subtitle" = "Also add completed works to the iOS Photos library.";
+"settings.saveToSystemPhotos.title" = "Photos Saving";
+"settings.saveToSystemPhotos.subtitle" = "New captures stay in DualCam Works. Use Save on a work when you want to add it to Photos.";
+"settings.manualSaveOnly" = "Manual";
 "settings.keepOriginalStreams.title" = "Keep Front/Rear Originals";
 "settings.keepOriginalStreams.subtitle" = "Uses more storage; original-stream export comes later.";
 "settings.workNamingRule.title" = "Work Naming Rule";
