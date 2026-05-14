@@ -12,6 +12,8 @@
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>$(PRODUCT_NAME)</string>
+    <key>CFBundleDisplayName</key>
+    <string>DualCam</string>
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
@@ -47,10 +49,12 @@
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
     <key>NSCameraUsageDescription</key>
-    <string>此应用需要访问摄像头以实现双摄像头录像功能</string>
+    <string>DualCam needs camera access to preview and record with both cameras.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>此应用需要访问麦克风以录制视频声音</string>
+    <string>DualCam needs microphone access to record video audio.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>此应用需要保存录制的视频到相册</string>
+    <string>DualCam needs permission to save photos, Live Photos, and videos to your photo library.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>DualCam needs photo library access to view recorded videos.</string>
 </dict>
 </plist>

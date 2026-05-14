@@ -17,6 +17,7 @@ purpose: Dual-camera video recording with customizable layouts
 - **Architecture**: MVVM with ObservableObject pattern
 - **Key Frameworks**: AVFoundation, SwiftUI, Combine
 - **Unique Feature**: AVCaptureMultiCamSession for simultaneous front/back camera capture
+- **Localization**: English and Simplified Chinese via in-app language selection
 - **UI Style**: Clean glassmorphism design with gradient accents
 
 ## File Structure
@@ -34,7 +35,9 @@ DualCameraRecorder/
 │   ├── CameraPreviewView.swift         # Preview layers & overlays
 │   └── LayoutSelectorView.swift        # Layout picker UI
 ├── Resources/
-│   └── Assets.xcassets/
+│   ├── Assets.xcassets/
+│   ├── en.lproj/                       # English strings and permission copy
+│   └── zh-Hans.lproj/                  # Simplified Chinese strings and permission copy
 └── Info.plist                          # Camera permissions
 ```
 
@@ -84,6 +87,17 @@ NSMicrophoneUsageDescription  - Audio recording
 NSPhotoLibraryAddUsageDescription - Save videos to album
 ```
 
+## Localization Requirements
+
+Treat localization as part of every feature implementation.
+
+- Do not hard-code user-visible strings in SwiftUI views, managers, alerts, onboarding, settings, errors, or debug text shown to users.
+- Add every new display string to both `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings`.
+- Use `L10n.string(...)` for manager/error strings that are not automatically resolved by SwiftUI.
+- Keep enum raw values and identifiers stable; expose separate localized title and description keys for display copy.
+- Any new privacy permission requires an English default in `Info.plist` plus localized values in `en.lproj/InfoPlist.strings` and `zh-Hans.lproj/InfoPlist.strings`.
+- Before finishing text changes, run `plutil -lint` on changed `.strings` files and build when possible.
+
 ## Build Configuration
 
 - **Bundle ID**: `com.dualcamera.recorder`
@@ -95,8 +109,9 @@ NSPhotoLibraryAddUsageDescription - Save videos to album
 ### Adding a New Layout
 1. Add case to `LayoutType` enum in `LayoutManager.swift`
 2. Add icon mapping in `LayoutType.icon`
-3. Implement frame calculation in `getFrontCameraLayout()`
-4. Add preview in `LayoutPreviewMini`
+3. Add localized title and description keys in both `Localizable.strings` files
+4. Implement frame calculation in `getFrontCameraLayout()`
+5. Add preview in `LayoutPreviewMini`
 
 ### Modifying UI Style
 - Colors: Defined in `Design` enum in `ContentView.swift`

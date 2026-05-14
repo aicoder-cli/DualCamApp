@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "此应用需要访问摄像头以实现双摄像头录像功能";
+"NSMicrophoneUsageDescription" = "此应用需要访问麦克风以录制视频声音";
+"NSPhotoLibraryAddUsageDescription" = "此应用需要保存照片、Live Photo 和视频到相册";
+"NSPhotoLibraryUsageDescription" = "此应用需要打开相册以查看已录制的视频";

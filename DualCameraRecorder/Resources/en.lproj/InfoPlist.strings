@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "DualCam needs camera access to preview and record with both cameras.";
+"NSMicrophoneUsageDescription" = "DualCam needs microphone access to record video audio.";
+"NSPhotoLibraryAddUsageDescription" = "DualCam needs permission to save photos, Live Photos, and videos to your photo library.";
+"NSPhotoLibraryUsageDescription" = "DualCam needs photo library access to view recorded videos.";

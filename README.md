@@ -13,7 +13,8 @@
   <a href="#功能特性">功能特性</a> •
   <a href="#系统要求">系统要求</a> •
   <a href="#安装使用">安装使用</a> •
-  <a href="#技术架构">技术架构</a>
+  <a href="#技术架构">技术架构</a> •
+  <a href="#国际化开发规范">国际化开发规范</a>
 </p>
 
 ---
@@ -26,6 +27,7 @@
 | 🎨 **6种布局模式** | 画中画 / 左右分屏 / 上下分屏 / 对角 / 后置主屏 / 前置主屏 |
 | ✋ **自由拖拽** | 前置摄像头窗口可任意调整位置 |
 | ⚡ **录制中切换** | 录制过程中实时切换布局，不中断录制 |
+| 🌐 **中英文国际化** | 支持应用内语言选择，默认跟随系统语言 |
 | 💾 **自动保存** | 录制完成自动保存到系统相册 |
 
 ## 📱 系统要求
@@ -90,7 +92,9 @@ DualCameraRecorder/
 │   ├── CameraPreviewView.swift   # 摄像头预览
 │   └── LayoutSelectorView.swift  # 布局选择器
 └── Resources/                    # 资源文件
-    └── Assets.xcassets/
+    ├── Assets.xcassets/
+    ├── en.lproj/                 # 英文文案与权限说明
+    └── zh-Hans.lproj/            # 简体中文文案与权限说明
 ```
 
 ### 核心技术
@@ -99,6 +103,17 @@ DualCameraRecorder/
 - **AVFoundation** - 摄像头和录制引擎
 - **AVCaptureMultiCamSession** - 多摄像头同步捕获
 - **AVAssetWriter** - 视频合成与导出
+
+## 🌐 国际化开发规范
+
+本项目把国际化作为功能开发的一部分，新增或修改功能时需要同步处理英文和简体中文文案。
+
+- 新增用户可见文案时，不要在 SwiftUI 视图、管理器、弹窗、错误提示、设置页或引导页中硬编码显示字符串。
+- SwiftUI 文案使用 `Resources/en.lproj/Localizable.strings` 和 `Resources/zh-Hans.lproj/Localizable.strings` 中的 key。
+- 管理器、错误信息等非 SwiftUI 文案使用 `L10n.string(...)`，确保应用内语言切换后文案一致。
+- `LayoutType`、`CaptureMode` 等枚举保留稳定的技术标识，展示标题、描述、调试文案使用独立 localization key。
+- 新增隐私权限能力时，同时更新 `Info.plist` 默认英文说明，以及 `en.lproj/InfoPlist.strings`、`zh-Hans.lproj/InfoPlist.strings`。
+- 提交涉及文案的改动前，使用 `plutil -lint` 校验变更过的 `.strings` 文件，并尽量检查中英文界面显示效果。
 
 ## 📸 截图预览
 

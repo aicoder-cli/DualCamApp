@@ -15,6 +15,15 @@
 		A11111110000000000000006 /* CameraPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000006 /* CameraPreviewView.swift */; };
 		A11111110000000000000007 /* LayoutSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000007 /* LayoutSelectorView.swift */; };
 		A11111110000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000008 /* Assets.xcassets */; };
+		A11111110000000000000009 /* LivePhotoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000010 /* LivePhotoRecorder.swift */; };
+		A1111111000000000000000A /* QuickStartOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000A /* QuickStartOnboardingView.swift */; };
+		A1111111000000000000000B /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000B /* AppLanguage.swift */; };
+		A1111111000000000000000C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000E /* Localizable.strings */; };
+		A1111111000000000000000D /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000012 /* InfoPlist.strings */; };
+			A1111111000000000000000E /* WorksManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000013 /* WorksManager.swift */; };
+			A1111111000000000000000F /* WorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000014 /* WorksView.swift */; };
+			A11111110000000000000010 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000015 /* AppSettings.swift */; };
+			A11111110000000000000011 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000016 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +37,17 @@
 		A12222220000000000000007 /* LayoutSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutSelectorView.swift; sourceTree = "<group>"; };
 		A12222220000000000000008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A12222220000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1222222000000000000000A /* QuickStartOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickStartOnboardingView.swift; sourceTree = "<group>"; };
+		A1222222000000000000000B /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
+		A1222222000000000000000C /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		A1222222000000000000000D /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		A1222222000000000000000F /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		A12222220000000000000010 /* LivePhotoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoRecorder.swift; sourceTree = "<group>"; };
+		A12222220000000000000011 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+			A12222220000000000000013 /* WorksManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksManager.swift; sourceTree = "<group>"; };
+			A12222220000000000000014 /* WorksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksView.swift; sourceTree = "<group>"; };
+			A12222220000000000000015 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+			A12222220000000000000016 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +93,8 @@
 			isa = PBXGroup;
 			children = (
 				A12222220000000000000001 /* DualCameraRecorderApp.swift */,
+				A1222222000000000000000B /* AppLanguage.swift */,
+				A12222220000000000000015 /* AppSettings.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -83,6 +105,8 @@
 				A12222220000000000000003 /* CameraManager.swift */,
 				A12222220000000000000004 /* VideoRecorder.swift */,
 				A12222220000000000000005 /* LayoutManager.swift */,
+				A12222220000000000000010 /* LivePhotoRecorder.swift */,
+				A12222220000000000000013 /* WorksManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -91,8 +115,11 @@
 			isa = PBXGroup;
 			children = (
 				A12222220000000000000002 /* ContentView.swift */,
+				A1222222000000000000000A /* QuickStartOnboardingView.swift */,
 				A12222220000000000000006 /* CameraPreviewView.swift */,
 				A12222220000000000000007 /* LayoutSelectorView.swift */,
+				A12222220000000000000014 /* WorksView.swift */,
+				A12222220000000000000016 /* SettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -101,6 +128,8 @@
 			isa = PBXGroup;
 			children = (
 				A12222220000000000000008 /* Assets.xcassets */,
+				A1222222000000000000000E /* Localizable.strings */,
+				A12222220000000000000012 /* InfoPlist.strings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -147,6 +176,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
 			);
 			mainGroup = A14444440000000000000001;
 			productRefGroup = A14444440000000000000003 /* Products */;
@@ -164,6 +194,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A11111110000000000000008 /* Assets.xcassets in Resources */,
+				A1111111000000000000000C /* Localizable.strings in Resources */,
+				A1111111000000000000000D /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,15 +208,43 @@
 			files = (
 				A11111110000000000000001 /* DualCameraRecorderApp.swift in Sources */,
 				A11111110000000000000002 /* ContentView.swift in Sources */,
+				A1111111000000000000000A /* QuickStartOnboardingView.swift in Sources */,
+				A1111111000000000000000B /* AppLanguage.swift in Sources */,
 				A11111110000000000000003 /* CameraManager.swift in Sources */,
 				A11111110000000000000004 /* VideoRecorder.swift in Sources */,
 				A11111110000000000000005 /* LayoutManager.swift in Sources */,
 				A11111110000000000000006 /* CameraPreviewView.swift in Sources */,
 				A11111110000000000000007 /* LayoutSelectorView.swift in Sources */,
+				A11111110000000000000009 /* LivePhotoRecorder.swift in Sources */,
+				A1111111000000000000000E /* WorksManager.swift in Sources */,
+				A1111111000000000000000F /* WorksView.swift in Sources */,
+				A11111110000000000000010 /* AppSettings.swift in Sources */,
+				A11111110000000000000011 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		A1222222000000000000000E /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A1222222000000000000000C /* en */,
+				A1222222000000000000000D /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		A12222220000000000000012 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A1222222000000000000000F /* en */,
+				A12222220000000000000011 /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		A18888880000000000000001 /* Debug */ = {
@@ -313,7 +373,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = P3724G3229;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = DualCameraRecorder/Info.plist;
@@ -343,7 +403,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = P3724G3229;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = DualCameraRecorder/Info.plist;
