@@ -69,13 +69,29 @@ struct ContentView: View {
     @State private var isLivePhotoEnabled = false
     @State private var captureMode: CaptureMode = .video
     @State private var hasAppliedInitialPreferences = false
+    @State private var recordingControlsRevealed = false
+    @State private var hideControlsWorkItem: DispatchWorkItem?
     @AppStorage(SettingsKey.defaultLivePhotoDuration) private var defaultLivePhotoDuration: Double = 2.5
     @AppStorage(SettingsKey.shootingFrameRate) private var shootingFrameRate: Int = 30
     @AppStorage(SettingsKey.defaultCaptureMode) private var defaultCaptureModeRaw = DefaultCaptureMode.video.rawValue
     @AppStorage(SettingsKey.defaultLayout) private var defaultLayoutRaw = LayoutType.pictureInPicture.rawValue
     @AppStorage(SettingsKey.rememberLastLayout) private var rememberLastLayout = true
     @AppStorage(SettingsKey.lastLayout) private var lastLayoutRaw = LayoutType.pictureInPicture.rawValue
+    @AppStorage(SettingsKey.immersiveRecording) private var immersiveRecording = true
+    @AppStorage(SettingsKey.controlRevealSeconds) private var controlRevealSeconds = ControlRevealDuration.twoSeconds.rawValue
     @AppStorage(SettingsKey.saveToSystemPhotos) private var saveToSystemPhotos = true
+
+    private var isVideoRecording: Bool {
+        captureMode == .video && videoRecorder.recordingState == .recording
+    }
+
+    private var isImmersiveRecordingActive: Bool {
+        immersiveRecording && isVideoRecording
+    }
+
+    private var showsRecordingChrome: Bool {
+        !isImmersiveRecordingActive || recordingControlsRevealed
+    }
 
     // MARK: - Body
     var body: some View {
@@ -86,7 +102,8 @@ struct ContentView: View {
                 VStack(spacing: 18) {
                     DemoHeader(
                         isReady: cameraManager.isSessionRunning,
-                        isRecording: videoRecorder.recordingState == .recording,
+                        isRecording: isVideoRecording,
+                        showsModeSwitch: showsRecordingChrome,
                         captureMode: $captureMode,
                         showSettings: $showSettings
                     )
@@ -102,7 +119,7 @@ struct ContentView: View {
 
                     Spacer(minLength: 8)
 
-                    if cameraManager.isSessionRunning {
+                    if cameraManager.isSessionRunning && showsRecordingChrome {
                         LayoutToolbar(layoutManager: layoutManager)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
@@ -111,6 +128,7 @@ struct ContentView: View {
                         recordingState: videoRecorder.recordingState,
                         captureMode: captureMode,
                         latestWork: worksManager.latestWork,
+                        showsSideControls: showsRecordingChrome,
                         onStartRecording: {
                             if captureMode == .video {
                                 let frameRate = shootingFrameRate
@@ -182,6 +200,23 @@ struct ContentView: View {
             guard videoRecorder.recordingState == .idle else { return }
             Task<Void, Never> { await cameraManager.setPreferredFrameRate(Int32(frameRate)) }
         }
+        .onChange(of: videoRecorder.recordingState) { state in
+            if state == .recording && isImmersiveRecordingActive {
+                hideRecordingControlsImmediately()
+            } else if state != .recording {
+                resetRecordingControls()
+            }
+        }
+        .onChange(of: captureMode) { _ in
+            resetRecordingControls()
+        }
+        .onChange(of: immersiveRecording) { enabled in
+            if enabled && isVideoRecording {
+                hideRecordingControlsImmediately()
+            } else {
+                resetRecordingControls()
+            }
+        }
         .onChange(of: layoutManager.currentLayout) { layout in
             lastLayoutRaw = layout.rawValue
             updateRecordingLayoutSnapshot()
@@ -196,6 +231,7 @@ struct ContentView: View {
         .onChange(of: layoutManager.floatingShape) { _ in updateRecordingLayoutSnapshot() }
         .onChange(of: layoutManager.containerSize) { _ in updateRecordingLayoutSnapshot() }
         .onDisappear {
+            resetRecordingControls()
             clearRecordingHandlers()
             cameraManager.stopCapture()
             hasAppliedInitialPreferences = false
@@ -232,7 +268,9 @@ struct ContentView: View {
     }
 
     private func previewCard(size: CGSize) -> some View {
-        let previewHeight = max(360, size.height * 0.54)
+        let regularHeight = max(360, size.height * 0.54)
+        let immersiveHeight = min(max(440, size.height * 0.70), size.height - 230)
+        let previewHeight = isImmersiveRecordingActive ? max(regularHeight, immersiveHeight) : regularHeight
 
         return ZStack(alignment: .topLeading) {
             DualCameraPreviewContainer(
@@ -246,19 +284,35 @@ struct ContentView: View {
             )
             .shadow(color: .black.opacity(0.42), radius: 28, x: 0, y: 18)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(layoutManager.currentLayout.shortTitleKey)
-                    .font(.system(size: 12, weight: .black))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(Design.accent))
+            if showsRecordingChrome {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(layoutManager.currentLayout.shortTitleKey)
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Design.accent))
 
-                Text(layoutManager.currentLayout.titleKey)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.84))
+                    Text(layoutManager.currentLayout.titleKey)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.84))
+                }
+                .padding(18)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .padding(18)
+
+            if isImmersiveRecordingActive && !recordingControlsRevealed {
+                Text("recording.tapToRevealControls")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.72))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Color.black.opacity(0.42)))
+                    .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 16)
+                    .transition(.opacity)
+            }
 
             if captureMode == .photo {
                 LivePhotoToggle(isEnabled: $isLivePhotoEnabled)
@@ -267,8 +321,45 @@ struct ContentView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing)))
             }
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(TapGesture().onEnded { revealRecordingControls() })
         .frame(height: previewHeight)
-        .padding(.horizontal, 18)
+        .padding(.horizontal, isImmersiveRecordingActive ? 8 : 18)
+        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isImmersiveRecordingActive)
+        .animation(.easeInOut(duration: 0.18), value: showsRecordingChrome)
+    }
+
+    private func revealRecordingControls() {
+        guard isImmersiveRecordingActive else { return }
+
+        hideControlsWorkItem?.cancel()
+        withAnimation(.easeInOut(duration: 0.18)) {
+            recordingControlsRevealed = true
+        }
+
+        let workItem = DispatchWorkItem {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                recordingControlsRevealed = false
+            }
+        }
+        hideControlsWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(controlRevealSeconds), execute: workItem)
+    }
+
+    private func hideRecordingControlsImmediately() {
+        hideControlsWorkItem?.cancel()
+        hideControlsWorkItem = nil
+        withAnimation(.easeInOut(duration: 0.18)) {
+            recordingControlsRevealed = false
+        }
+    }
+
+    private func resetRecordingControls() {
+        hideControlsWorkItem?.cancel()
+        hideControlsWorkItem = nil
+        withAnimation(.easeInOut(duration: 0.18)) {
+            recordingControlsRevealed = false
+        }
     }
 
     private func configureRecordingHandlers() {
@@ -334,6 +425,7 @@ struct ContentView: View {
 private struct DemoHeader: View {
     let isReady: Bool
     let isRecording: Bool
+    let showsModeSwitch: Bool
     @Binding var captureMode: CaptureMode
     @Binding var showSettings: Bool
 
@@ -368,7 +460,12 @@ private struct DemoHeader: View {
 
             Spacer()
 
-            ModeSegmentedControl(selection: $captureMode)
+            if showsModeSwitch {
+                ModeSegmentedControl(selection: $captureMode)
+                    .opacity(isRecording ? 0.72 : 1)
+                    .allowsHitTesting(!isRecording)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             Button(action: { showSettings = true }) {
                 Image(systemName: "gearshape.fill")
@@ -446,6 +543,7 @@ struct BottomControlBar: View {
     let recordingState: RecordingState
     let captureMode: CaptureMode
     let latestWork: WorkItem?
+    let showsSideControls: Bool
     let onStartRecording: () -> Void
     let onStopRecording: () -> Void
     let onCustomize: () -> Void
@@ -456,6 +554,8 @@ struct BottomControlBar: View {
             SideActionButton(icon: "slider.horizontal.3") {
                 onCustomize()
             }
+            .opacity(showsSideControls ? 1 : 0)
+            .allowsHitTesting(showsSideControls)
 
             Spacer()
 
@@ -471,6 +571,8 @@ struct BottomControlBar: View {
             WorksEntryButton(latestWork: latestWork) {
                 onOpenAlbum()
             }
+            .opacity(showsSideControls ? 1 : 0)
+            .allowsHitTesting(showsSideControls)
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 10)
@@ -485,6 +587,7 @@ struct BottomControlBar: View {
         )
         .shadow(color: Design.pillShadow, radius: 16, x: 0, y: 8)
         .padding(.horizontal, 18)
+        .animation(.easeInOut(duration: 0.18), value: showsSideControls)
     }
 }
 

@@ -7,6 +7,7 @@
 "status.ready" = "READY";
 "status.starting" = "STARTING";
 "status.recording" = "REC";
+"recording.tapToRevealControls" = "Tap preview to show controls";
 "status.readyValue" = "Ready";
 "status.notReady" = "Not Ready";
 
@@ -233,7 +234,7 @@
 "settings.livePhotoDuration.extended" = "5 sec";
 
 "settings.immersiveRecording.title" = "Immersive Recording";
-"settings.immersiveRecording.subtitle" = "Hide low-frequency controls while recording in a later pass.";
+"settings.immersiveRecording.subtitle" = "Hide low-frequency controls while recording.";
 "settings.controlRevealTime.title" = "Control Reveal Time";
 "settings.controlRevealTime.subtitle" = "How long controls stay visible after interaction.";
 "settings.controlReveal.2" = "2 sec";

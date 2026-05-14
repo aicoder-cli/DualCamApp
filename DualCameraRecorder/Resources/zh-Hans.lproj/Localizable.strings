@@ -7,6 +7,7 @@
 "status.ready" = "就绪";
 "status.starting" = "启动中";
 "status.recording" = "录制中";
+"recording.tapToRevealControls" = "轻点预览显示控制项";
 "status.readyValue" = "就绪";
 "status.notReady" = "未就绪";
 
@@ -233,7 +234,7 @@
 "settings.livePhotoDuration.extended" = "5 秒";
 
 "settings.immersiveRecording.title" = "沉浸式录制";
-"settings.immersiveRecording.subtitle" = "后续录制时隐藏低频控制项。";
+"settings.immersiveRecording.subtitle" = "录制时隐藏低频控制项。";
 "settings.controlRevealTime.title" = "控制显示时长";
 "settings.controlRevealTime.subtitle" = "交互后控制项保持可见的时间。";
 "settings.controlReveal.2" = "2 秒";
