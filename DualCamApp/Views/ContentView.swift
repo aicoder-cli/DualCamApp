@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  DualCameraRecorder
+//  DualCamApp
 //
 //  主视图 - 整合所有功能模块（清新风格）
 //

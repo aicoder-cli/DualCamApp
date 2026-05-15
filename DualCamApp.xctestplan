@@ -14,9 +14,9 @@
   "testTargets" : [
     {
       "target" : {
-        "containerPath" : "container:DualCameraRecorder.xcodeproj",
+        "containerPath" : "container:DualCamApp.xcodeproj",
         "identifier" : "A15555550000000000000004",
-        "name" : "DualCameraRecorderTests"
+        "name" : "DualCamAppTests"
       }
     }
   ],

@@ -1,6 +1,6 @@
 //
 //  VideoRecorder.swift
-//  DualCameraRecorder
+//  DualCamApp
 //
 //  视频录制引擎 - 负责合成双摄像头画面并录制视频
 //
@@ -229,11 +229,11 @@ class VideoRecorder: ObservableObject {
         audioInput?.expectsMediaDataInRealTime = true
         
         guard let assetWriter, let videoInput else {
-            throw NSError(domain: "DualCameraRecorder", code: -1, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.recorder.initializationFailed")])
+            throw NSError(domain: "DualCamApp", code: -1, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.recorder.initializationFailed")])
         }
 
         guard assetWriter.canAdd(videoInput) else {
-            throw NSError(domain: "DualCameraRecorder", code: -2, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.cannotAddInput")])
+            throw NSError(domain: "DualCamApp", code: -2, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.cannotAddInput")])
         }
         assetWriter.add(videoInput)
 
@@ -242,7 +242,7 @@ class VideoRecorder: ObservableObject {
         }
 
         guard assetWriter.startWriting() else {
-            throw assetWriter.error ?? NSError(domain: "DualCameraRecorder", code: -3, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.cannotStartWriting")])
+            throw assetWriter.error ?? NSError(domain: "DualCamApp", code: -3, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.cannotStartWriting")])
         }
     }
     
@@ -484,7 +484,7 @@ class VideoRecorder: ObservableObject {
         try await withCheckedThrowingContinuation { continuation in
             processingQueue.async { [weak self] in
                 guard let self else {
-                    continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -20, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.generatorReleased")]))
+                    continuation.resume(throwing: NSError(domain: "DualCamApp", code: -20, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.generatorReleased")]))
                     return
                 }
 
@@ -494,13 +494,13 @@ class VideoRecorder: ObservableObject {
                     guard let frontBuffer = state.frontBuffer,
                           let backBuffer = state.backBuffer,
                           let snapshot = state.snapshot else {
-                        continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -21, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.camera.noFrameToSave")]))
+                        continuation.resume(throwing: NSError(domain: "DualCamApp", code: -21, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.camera.noFrameToSave")]))
                         return
                     }
 
                     guard let image = self.composeImages(frontBuffer: frontBuffer, backBuffer: backBuffer, layoutSnapshot: snapshot),
                           let imageData = image.jpegData(compressionQuality: 0.92) else {
-                        continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -22, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.compositionFailed")]))
+                        continuation.resume(throwing: NSError(domain: "DualCamApp", code: -22, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.compositionFailed")]))
                         return
                     }
 
@@ -520,7 +520,7 @@ class VideoRecorder: ObservableObject {
         try await withCheckedThrowingContinuation { continuation in
             processingQueue.async { [weak self] in
                 guard let self else {
-                    continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -40, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.generatorReleased")]))
+                    continuation.resume(throwing: NSError(domain: "DualCamApp", code: -40, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.generatorReleased")]))
                     return
                 }
 
@@ -530,12 +530,12 @@ class VideoRecorder: ObservableObject {
                     guard let frontBuffer = state.frontBuffer,
                           let backBuffer = state.backBuffer,
                           let snapshot = state.snapshot else {
-                        continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -41, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.camera.noFrameToSave")]))
+                        continuation.resume(throwing: NSError(domain: "DualCamApp", code: -41, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.camera.noFrameToSave")]))
                         return
                     }
 
                     guard let image = self.composeImages(frontBuffer: frontBuffer, backBuffer: backBuffer, layoutSnapshot: snapshot) else {
-                        continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -42, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillCompositionFailed")]))
+                        continuation.resume(throwing: NSError(domain: "DualCamApp", code: -42, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillCompositionFailed")]))
                         return
                     }
 
@@ -565,7 +565,7 @@ class VideoRecorder: ObservableObject {
         let recorder: LivePhotoRecorder = try await withCheckedThrowingContinuation { continuation in
             processingQueue.async { [weak self] in
                 guard let self, let recorder = self.livePhotoRecorder else {
-                    continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -43, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.recorderNotInitialized")]))
+                    continuation.resume(throwing: NSError(domain: "DualCamApp", code: -43, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.recorderNotInitialized")]))
                     return
                 }
 

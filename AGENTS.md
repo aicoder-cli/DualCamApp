@@ -5,7 +5,7 @@
 ## Project Identity
 
 ```yaml
-name: DualCameraRecorder
+name: DualCamApp
 type: iOS Application
 language: Swift (SwiftUI)
 platform: iOS 15.0+
@@ -23,9 +23,9 @@ purpose: Dual-camera video recording with customizable layouts
 ## File Structure
 
 ```
-DualCameraRecorder/
+DualCamApp/
 ├── App/
-│   └── DualCameraRecorderApp.swift     # @main entry point
+│   └── DualCamApp.swift     # @main entry point
 ├── Managers/
 │   ├── CameraManager.swift             # AVCaptureSession management
 │   ├── VideoRecorder.swift             # AVAssetWriter recording
@@ -100,7 +100,7 @@ Treat localization as part of every feature implementation.
 
 ## Build Configuration
 
-- **Bundle ID**: `com.dualcamera.recorder`
+- **Bundle ID**: `com.dualcam.ai`
 - **Team**: Must be set in Xcode (CODE_SIGN_STYLE = Automatic)
 - **Device**: Requires physical iPhone (multi-cam not supported in simulator)
 

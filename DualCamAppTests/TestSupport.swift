@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 import XCTest
-@testable import DualCameraRecorder
+@testable import DualCamApp
 
 enum TestSupport {
     static func assertCGFloat(_ actual: CGFloat, _ expected: CGFloat, accuracy: CGFloat = 0.001, file: StaticString = #filePath, line: UInt = #line) {

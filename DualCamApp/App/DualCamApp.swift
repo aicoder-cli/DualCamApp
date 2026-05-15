@@ -1,6 +1,6 @@
 //
-//  DualCameraRecorderApp.swift
-//  DualCameraRecorder
+//  DualCamApp.swift
+//  DualCamApp
 //
 //  应用入口
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct DualCameraRecorderApp: App {
+struct DualCamApp: App {
     @AppStorage("hasCompletedQuickStartOnboarding") private var hasCompletedQuickStartOnboarding = false
     @AppStorage(SettingsKey.appLanguageCode) private var appLanguageCode = AppLanguage.system.rawValue
 

@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import DualCameraRecorder
+@testable import DualCamApp
 
 final class WorksPresentationTests: XCTestCase {
     func testVideoDurationTextFormatsSeconds() {

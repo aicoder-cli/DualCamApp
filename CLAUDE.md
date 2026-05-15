@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-DualCameraRecorder is a native iOS app built with SwiftUI and AVFoundation. It previews front and back cameras simultaneously, offers several split-screen/picture-in-picture layouts, and records a composited MP4 that is saved to the user's photo library.
+DualCamApp is a native iOS app built with SwiftUI and AVFoundation. It previews front and back cameras simultaneously, offers several split-screen/picture-in-picture layouts, and records a composited MP4 that is saved to the user's photo library.
 
 Requirements from the project metadata and README:
 - Xcode 15+
@@ -14,32 +14,32 @@ Requirements from the project metadata and README:
 
 ## Commands
 
-Run commands from the repository root (`DualCameraRecorder/`).
+Run commands from the repository root (`DualCamApp/`).
 
 ```bash
 # Open in Xcode
-open DualCameraRecorder.xcodeproj
+open DualCamApp.xcodeproj
 
 # Inspect targets and schemes
-xcodebuild -list -project DualCameraRecorder.xcodeproj
+xcodebuild -list -project DualCamApp.xcodeproj
 
 # Build the app target for iOS
-xcodebuild -project DualCameraRecorder.xcodeproj \
-  -scheme DualCameraRecorder \
+xcodebuild -project DualCamApp.xcodeproj \
+  -scheme DualCamApp \
   -configuration Debug \
   -destination 'generic/platform=iOS' \
   build
 
 # Build for the iOS simulator when only checking compile/UI code
-xcodebuild -project DualCameraRecorder.xcodeproj \
-  -scheme DualCameraRecorder \
+xcodebuild -project DualCamApp.xcodeproj \
+  -scheme DualCamApp \
   -configuration Debug \
   -destination 'generic/platform=iOS Simulator' \
   build
 
 # Clean build artifacts
-xcodebuild -project DualCameraRecorder.xcodeproj \
-  -scheme DualCameraRecorder \
+xcodebuild -project DualCamApp.xcodeproj \
+  -scheme DualCamApp \
   clean
 ```
 
@@ -47,32 +47,32 @@ There are currently no test targets, test plans, SwiftPM package, SwiftLint conf
 
 ```bash
 # Run all tests once a test target exists
-xcodebuild test -project DualCameraRecorder.xcodeproj \
-  -scheme DualCameraRecorder \
+xcodebuild test -project DualCamApp.xcodeproj \
+  -scheme DualCamApp \
   -destination 'platform=iOS Simulator,name=iPhone 15'
 
 # Run a single test once a test target exists
-xcodebuild test -project DualCameraRecorder.xcodeproj \
-  -scheme DualCameraRecorder \
+xcodebuild test -project DualCamApp.xcodeproj \
+  -scheme DualCamApp \
   -destination 'platform=iOS Simulator,name=iPhone 15' \
-  -only-testing:DualCameraRecorderTests/TestClass/testMethod
+  -only-testing:DualCamAppTests/TestClass/testMethod
 ```
 
 ## Architecture
 
-- `DualCameraRecorder/App/DualCameraRecorderApp.swift` is the SwiftUI app entry point. It hosts `ContentView`, hides the status bar, and forces dark mode.
-- `DualCameraRecorder/Views/ContentView.swift` is the composition root for runtime state. It owns `CameraManager`, `LayoutManager`, and `VideoRecorder` as `@StateObject`s, starts capture on appear, stops capture on disappear, and coordinates the preview, recording controls, layout toolbar, settings sheet, loading state, and error banner.
-- `DualCameraRecorder/Managers/CameraManager.swift` is the AVFoundation capture layer. It is `@MainActor`, manages separate front and back `AVCaptureSession`s, exposes their `AVCaptureVideoPreviewLayer`s to SwiftUI, requests camera/microphone permissions, and provides camera controls such as torch, zoom, and focus. It also exposes front/back sample-buffer handlers for recording integrations.
-- `DualCameraRecorder/Managers/LayoutManager.swift` owns the layout model. `LayoutType` defines the available layouts, while `LayoutManager` publishes the current layout, drag/scale transforms, and container size, then computes `CameraLayoutInfo` for each camera preview.
-- `DualCameraRecorder/Views/CameraPreviewView.swift` bridges `AVCaptureVideoPreviewLayer` into SwiftUI with `UIViewRepresentable`. `DualCameraPreviewContainer` lays out the live previews using `CameraManager` and `LayoutManager`; the front camera overlay handles drag gestures.
-- `DualCameraRecorder/Views/LayoutSelectorView.swift` renders layout selection UI. Both the expanded selector and bottom toolbar iterate over `LayoutType.allCases`, so new layout cases appear in the UI when the enum and icon are updated.
-- `DualCameraRecorder/Managers/VideoRecorder.swift` wraps `AVAssetWriter` for recording. It targets a 1920x1080 H.264 MP4 with AAC audio, keeps front/back frame buffers, composites frames according to `LayoutType`, writes to Documents, and saves the result with `PHPhotoLibrary`.
+- `DualCamApp/App/DualCamApp.swift` is the SwiftUI app entry point. It hosts `ContentView`, hides the status bar, and forces dark mode.
+- `DualCamApp/Views/ContentView.swift` is the composition root for runtime state. It owns `CameraManager`, `LayoutManager`, and `VideoRecorder` as `@StateObject`s, starts capture on appear, stops capture on disappear, and coordinates the preview, recording controls, layout toolbar, settings sheet, loading state, and error banner.
+- `DualCamApp/Managers/CameraManager.swift` is the AVFoundation capture layer. It is `@MainActor`, manages separate front and back `AVCaptureSession`s, exposes their `AVCaptureVideoPreviewLayer`s to SwiftUI, requests camera/microphone permissions, and provides camera controls such as torch, zoom, and focus. It also exposes front/back sample-buffer handlers for recording integrations.
+- `DualCamApp/Managers/LayoutManager.swift` owns the layout model. `LayoutType` defines the available layouts, while `LayoutManager` publishes the current layout, drag/scale transforms, and container size, then computes `CameraLayoutInfo` for each camera preview.
+- `DualCamApp/Views/CameraPreviewView.swift` bridges `AVCaptureVideoPreviewLayer` into SwiftUI with `UIViewRepresentable`. `DualCameraPreviewContainer` lays out the live previews using `CameraManager` and `LayoutManager`; the front camera overlay handles drag gestures.
+- `DualCamApp/Views/LayoutSelectorView.swift` renders layout selection UI. Both the expanded selector and bottom toolbar iterate over `LayoutType.allCases`, so new layout cases appear in the UI when the enum and icon are updated.
+- `DualCamApp/Managers/VideoRecorder.swift` wraps `AVAssetWriter` for recording. It targets a 1920x1080 H.264 MP4 with AAC audio, keeps front/back frame buffers, composites frames according to `LayoutType`, writes to Documents, and saves the result with `PHPhotoLibrary`.
 
 ## Cross-cutting implementation notes
 
 - Layout behavior is duplicated between live preview calculations in `LayoutManager` and recorded-video drawing methods in `VideoRecorder`. When adding or changing a `LayoutType`, keep both paths in sync so the saved video matches the on-screen preview.
 - Camera and recorder objects are main-actor observable state, but video sample buffers arrive from AVFoundation delegate queues. Be careful with actor isolation and avoid doing heavy frame composition on the main thread.
-- Permission strings live in `DualCameraRecorder/Info.plist` for camera, microphone, and photo-library saving. Any new hardware or privacy-sensitive feature needs the corresponding plist usage key and matching `InfoPlist.strings` entries.
+- Permission strings live in `DualCamApp/Info.plist` for camera, microphone, and photo-library saving. Any new hardware or privacy-sensitive feature needs the corresponding plist usage key and matching `InfoPlist.strings` entries.
 - The app's primary behavior depends on hardware camera sessions, so compile success is not enough for camera/recording changes; verify on a physical device when changing capture, torch, focus, recording, or photo-library save behavior.
 
 ## Localization requirements

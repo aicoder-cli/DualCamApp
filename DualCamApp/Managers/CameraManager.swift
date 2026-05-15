@@ -1,6 +1,6 @@
 //
 //  CameraManager.swift
-//  DualCameraRecorder
+//  DualCamApp
 //
 //  多摄像头管理器 - 负责同时管理前后摄像头
 //

@@ -80,7 +80,7 @@ final class WorksManager: ObservableObject {
         self.fileManager = fileManager
         documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let supportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("DualCameraRecorder", isDirectory: true)
+            .appendingPathComponent("DualCamApp", isDirectory: true)
         thumbnailsDirectory = supportDirectory.appendingPathComponent("WorksThumbnails", isDirectory: true)
         indexURL = supportDirectory.appendingPathComponent("works_index.json")
         reload()

@@ -1,6 +1,6 @@
 //
 //  LivePhotoRecorder.swift
-//  DualCameraRecorder
+//  DualCamApp
 //
 
 @preconcurrency import AVFoundation
@@ -52,7 +52,7 @@ final class LivePhotoRecorder: @unchecked Sendable {
         videoInput.expectsMediaDataInRealTime = true
 
         guard assetWriter.canAdd(videoInput) else {
-            throw NSError(domain: "DualCameraRecorder", code: -30, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.cannotAddVideoInput")])
+            throw NSError(domain: "DualCamApp", code: -30, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.cannotAddVideoInput")])
         }
         assetWriter.add(videoInput)
 
@@ -113,7 +113,7 @@ final class LivePhotoRecorder: @unchecked Sendable {
 
     func finish() async throws {
         guard hasStarted else {
-            throw NSError(domain: "DualCameraRecorder", code: -31, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.noMotionFrames")])
+            throw NSError(domain: "DualCamApp", code: -31, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.noMotionFrames")])
         }
 
         videoInput.markAsFinished()
@@ -125,7 +125,7 @@ final class LivePhotoRecorder: @unchecked Sendable {
                 if writer.status == .completed {
                     continuation.resume()
                 } else {
-                    continuation.resume(throwing: writer.error ?? NSError(domain: "DualCameraRecorder", code: -32, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.videoWriteFailed")]))
+                    continuation.resume(throwing: writer.error ?? NSError(domain: "DualCamApp", code: -32, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.videoWriteFailed")]))
                 }
             }
         }
@@ -137,11 +137,11 @@ final class LivePhotoRecorder: @unchecked Sendable {
         }
 
         guard let cgImage = image.cgImage else {
-            throw NSError(domain: "DualCameraRecorder", code: -33, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillGenerationFailed")])
+            throw NSError(domain: "DualCamApp", code: -33, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillGenerationFailed")])
         }
 
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
-            throw NSError(domain: "DualCameraRecorder", code: -34, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.cannotCreateStillFile")])
+            throw NSError(domain: "DualCamApp", code: -34, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.cannotCreateStillFile")])
         }
 
         let metadata: [CFString: Any] = [
@@ -152,7 +152,7 @@ final class LivePhotoRecorder: @unchecked Sendable {
         CGImageDestinationAddImage(destination, cgImage, metadata as CFDictionary)
 
         guard CGImageDestinationFinalize(destination) else {
-            throw NSError(domain: "DualCameraRecorder", code: -35, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillWriteFailed")])
+            throw NSError(domain: "DualCamApp", code: -35, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillWriteFailed")])
         }
     }
 

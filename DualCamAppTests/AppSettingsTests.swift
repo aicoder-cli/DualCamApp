@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import DualCameraRecorder
+@testable import DualCamApp
 
 final class AppSettingsTests: XCTestCase {
     private var suiteName: String!
@@ -8,7 +8,7 @@ final class AppSettingsTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        suiteName = "DualCameraRecorderTests.\(UUID().uuidString)"
+        suiteName = "DualCamAppTests.\(UUID().uuidString)"
         userDefaults = UserDefaults(suiteName: suiteName)
         userDefaults.removePersistentDomain(forName: suiteName)
     }

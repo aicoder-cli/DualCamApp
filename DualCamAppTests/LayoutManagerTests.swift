@@ -1,6 +1,6 @@
 import CoreGraphics
 import XCTest
-@testable import DualCameraRecorder
+@testable import DualCamApp
 
 final class LayoutManagerTests: XCTestCase {
     func testLayoutTypeFromUnknownRawValueReturnsPictureInPicture() {

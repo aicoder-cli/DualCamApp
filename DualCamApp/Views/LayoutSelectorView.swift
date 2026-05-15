@@ -1,6 +1,6 @@
 //
 //  LayoutSelectorView.swift
-//  DualCameraRecorder
+//  DualCamApp
 //
 //  布局选择器视图 - 提供预设布局选择界面（清新风格）
 //

@@ -627,7 +627,7 @@ private struct WorkDetailView: View {
                 } else if success {
                     continuation.resume()
                 } else {
-                    continuation.resume(throwing: NSError(domain: "DualCameraRecorder", code: -1))
+                    continuation.resume(throwing: NSError(domain: "DualCamApp", code: -1))
                 }
             }
         }

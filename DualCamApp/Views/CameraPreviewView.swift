@@ -1,6 +1,6 @@
 //
 //  CameraPreviewView.swift
-//  DualCameraRecorder
+//  DualCamApp
 //
 //  摄像头预览视图 - 使用UIViewRepresentable包装AVCaptureVideoPreviewLayer（清新风格）
 //

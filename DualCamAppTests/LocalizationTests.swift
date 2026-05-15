@@ -1,11 +1,11 @@
 import XCTest
-@testable import DualCameraRecorder
+@testable import DualCamApp
 
 final class LocalizationTests: XCTestCase {
-    private let localizableEN = "DualCameraRecorder/Resources/en.lproj/Localizable.strings"
-    private let localizableZH = "DualCameraRecorder/Resources/zh-Hans.lproj/Localizable.strings"
-    private let infoPlistEN = "DualCameraRecorder/Resources/en.lproj/InfoPlist.strings"
-    private let infoPlistZH = "DualCameraRecorder/Resources/zh-Hans.lproj/InfoPlist.strings"
+    private let localizableEN = "DualCamApp/Resources/en.lproj/Localizable.strings"
+    private let localizableZH = "DualCamApp/Resources/zh-Hans.lproj/Localizable.strings"
+    private let infoPlistEN = "DualCamApp/Resources/en.lproj/InfoPlist.strings"
+    private let infoPlistZH = "DualCamApp/Resources/zh-Hans.lproj/InfoPlist.strings"
 
     func testLocalizableKeySetsMatchBetweenEnglishAndSimplifiedChinese() throws {
         let english = try StringsFile.load(localizableEN)

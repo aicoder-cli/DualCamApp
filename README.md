@@ -42,11 +42,11 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/aicoder-cli/DualCameraRecorder.git
-cd DualCameraRecorder
+git clone https://github.com/aicoder-cli/DualCamApp.git
+cd DualCamApp
 
 # 用 Xcode 打开
-open DualCameraRecorder.xcodeproj
+open DualCamApp.xcodeproj
 ```
 
 1. 在 Xcode 中选择你的 **Apple Developer Team**
@@ -80,9 +80,9 @@ open DualCameraRecorder.xcodeproj
 ## 🏗 技术架构
 
 ```
-DualCameraRecorder/
+DualCamApp/
 ├── App/                          # 应用入口
-│   └── DualCameraRecorderApp.swift
+│   └── DualCamApp.swift
 ├── Managers/                     # 核心管理器
 │   ├── CameraManager.swift       # 双摄像头管理
 │   ├── VideoRecorder.swift       # 视频录制引擎
