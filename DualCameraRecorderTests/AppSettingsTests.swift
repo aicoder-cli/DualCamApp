@@ -36,7 +36,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.controlRevealSeconds), ControlRevealDuration.twoSeconds.rawValue)
         XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.recordingCountdownSeconds), RecordingCountdown.off.rawValue)
         XCTAssertTrue(userDefaults.bool(forKey: SettingsKey.soundAndHapticsEnabled))
-        XCTAssertTrue(userDefaults.bool(forKey: SettingsKey.saveToSystemPhotos))
+        XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.saveToSystemPhotos))
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.keepOriginalStreams))
         XCTAssertEqual(userDefaults.string(forKey: SettingsKey.workNamingRule), WorkNamingRule.dateLayout.rawValue)
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.autoClearCache))

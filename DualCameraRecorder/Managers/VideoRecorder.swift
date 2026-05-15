@@ -658,6 +658,8 @@ class VideoRecorder: ObservableObject {
             bitmapInfo: bitmapInfo
         ) else { return nil }
 
+        context.translateBy(x: 0, y: outputSize.height)
+        context.scaleBy(x: 1, y: -1)
         context.interpolationQuality = .high
         context.setFillColor(UIColor.black.cgColor)
         context.fill(CGRect(origin: .zero, size: outputSize))
@@ -763,7 +765,9 @@ class VideoRecorder: ObservableObject {
 
         clip(layout, in: context)
         let drawRect = aspectFillRect(for: sourceSize, in: layout.frame)
-        context.draw(image, in: drawRect)
+        context.translateBy(x: drawRect.minX, y: drawRect.maxY)
+        context.scaleBy(x: 1, y: -1)
+        context.draw(image, in: CGRect(origin: .zero, size: drawRect.size))
     }
 
     /// 合成两个摄像头图像

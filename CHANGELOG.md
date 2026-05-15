@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-15 - Recorded layout orientation fix
+
+### Fixed
+
+- Fixed recorded output being upside down in picture-in-picture, circle reaction, director stack, and diagonal cut layouts while preserving the on-screen layout positions in saved videos.
+
+### Verified
+
+- Real-device recording was confirmed after the compositor orientation adjustment.
+
 ## 2026-05-14 - Works review and local-only capture library
 
 ### Added
