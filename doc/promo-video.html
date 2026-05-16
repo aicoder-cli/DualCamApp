@@ -155,16 +155,12 @@
     </section>
   </main>
   <script>
+    window.__setTime = function () {};
     function start() {
       document.body.classList.add('play');
       window.__ready = true;
     }
-    window.__setTime = function () {};
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(function () { requestAnimationFrame(start); });
-    } else {
-      requestAnimationFrame(start);
-    }
+    requestAnimationFrame(start);
   </script>
 </body>
 </html>
