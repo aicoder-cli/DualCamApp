@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DualCam 双摄录像 · 交互原型</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --dc-bg: #050608;
+      --dc-raised: #07080a;
+      --dc-panel: #0b0c10;
+      --dc-surface: rgba(255,255,255,0.06);
+      --dc-surface-strong: rgba(255,255,255,0.10);
+      --dc-line: rgba(255,255,255,0.12);
+      --dc-line-soft: rgba(255,255,255,0.07);
+      --dc-text: #f5f5f7;
+      --dc-muted: rgba(245,245,247,0.62);
+      --dc-faint: rgba(245,245,247,0.42);
+      --dc-accent: #d6ff4d;
+      --dc-accent-soft: rgba(214,255,77,0.16);
+      --dc-record: #ff453a;
+      --dc-record-soft: rgba(255,69,58,0.16);
+      --dc-ink: #050608;
+      --dc-radius-xl: 34px;
+      --dc-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, "PingFang SC", sans-serif;
+      --dc-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--dc-bg); }
+    body { font-family: var(--dc-font); color: var(--dc-text); letter-spacing: -0.01em; }
+    button { font: inherit; border: 0; cursor: pointer; }
+    img { display: block; max-width: 100%; }
+    #root { min-height: 100vh; }
+    .page {
+      min-height: 100vh;
+      padding: 32px;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(214,255,77,0.18), transparent 28%),
+        radial-gradient(circle at 84% 16%, rgba(159,212,255,0.10), transparent 30%),
+        linear-gradient(180deg, #08090c 0%, var(--dc-bg) 42%, #020203 100%);
+    }
+    .shell { max-width: 1440px; margin: 0 auto; }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+      gap: 42px;
+      align-items: end;
+      min-height: 360px;
+      margin-bottom: 30px;
+    }
+    .brand-row { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+    .app-icon { width: 72px; height: 72px; border-radius: 24px; box-shadow: 0 24px 70px rgba(214,255,77,0.16); }
+    .eyebrow { color: var(--dc-accent); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+    h1 { margin: 0; max-width: 760px; font-size: clamp(48px, 7vw, 104px); line-height: 0.88; letter-spacing: -0.08em; }
+    .lead { margin: 24px 0 0; max-width: 620px; color: var(--dc-muted); font-size: 18px; line-height: 1.55; text-wrap: pretty; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .chip { padding: 10px 13px; border-radius: 999px; background: var(--dc-surface); border: 1px solid var(--dc-line); color: rgba(245,245,247,0.78); font-size: 12px; }
+    .hero-proof { display: grid; grid-template-columns: 0.75fr 1fr; gap: 14px; align-items: end; }
+    .proof-card { overflow: hidden; border-radius: 28px; border: 1px solid var(--dc-line); background: var(--dc-surface); box-shadow: 0 26px 86px rgba(0,0,0,0.36); }
+    .proof-card.tall { transform: rotate(-2deg); }
+    .proof-card.wide { transform: rotate(2deg); }
+    .proof-card img { width: 100%; height: 320px; object-fit: cover; object-position: top center; }
+    .proof-caption { padding: 14px 16px; color: var(--dc-muted); font-size: 12px; border-top: 1px solid var(--dc-line-soft); }
+    .canvas { display: grid; grid-template-columns: 455px minmax(0, 1fr); gap: 34px; align-items: start; }
+    .phone-column { position: sticky; top: 28px; }
+    .phone-label { display: flex; justify-content: space-between; align-items: baseline; padding: 0 8px 12px; color: var(--dc-faint); font-size: 12px; }
+    .phone-label strong { color: var(--dc-text); font-size: 14px; }
+    .right-panel { display: grid; gap: 18px; }
+    .panel { border: 1px solid var(--dc-line); background: rgba(7,8,10,0.72); border-radius: 30px; padding: 22px; backdrop-filter: blur(20px); box-shadow: 0 30px 90px rgba(0,0,0,0.22); }
+    .panel h2 { margin: 0 0 12px; font-size: 28px; line-height: 1; letter-spacing: -0.055em; }
+    .panel p { margin: 0; color: var(--dc-muted); line-height: 1.55; }
+    .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .step { padding: 16px; border-radius: 22px; background: var(--dc-surface); border: 1px solid var(--dc-line-soft); min-height: 132px; }
+    .step-index { color: var(--dc-accent); font-family: var(--dc-mono); font-size: 12px; margin-bottom: 16px; }
+    .step b { display: block; margin-bottom: 7px; }
+    .step span { color: var(--dc-muted); font-size: 13px; line-height: 1.45; }
+    .asset-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; }
+    .asset-tile { overflow: hidden; border-radius: 24px; border: 1px solid var(--dc-line-soft); background: var(--dc-surface); }
+    .asset-tile img { width: 100%; height: 240px; object-fit: cover; object-position: top center; }
+    .asset-tile.large img { height: 360px; }
+    .asset-tile div { padding: 12px 14px; color: var(--dc-muted); font-size: 12px; border-top: 1px solid var(--dc-line-soft); }
+    .ios-wrapper { display: inline-block; padding: 12px; background: #000; border-radius: 60px; box-shadow: 0 0 0 2px #1f2937, 0 34px 100px rgba(0,0,0,0.44); position: relative; }
+    .ios-screen { position: relative; width: 393px; height: 852px; border-radius: 48px; overflow: hidden; background: #000; }
+    .ios-status { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; color: #fff; font-size: 16px; font-weight: 600; z-index: 20; pointer-events: none; }
+    .ios-island { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; background: #000; border-radius: 999px; z-index: 30; }
+    .ios-icons { display: flex; align-items: center; gap: 6px; }
+    .ios-signal { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+    .ios-signal i { width: 3px; background: currentColor; border-radius: 1px; }
+    .ios-battery { width: 26px; height: 12px; border: 1.5px solid currentColor; border-radius: 3px; padding: 1px; position: relative; opacity: 0.8; }
+    .ios-battery::after { content: ""; position: absolute; top: 3px; right: -3px; width: 2px; height: 6px; background: currentColor; border-radius: 0 1px 1px 0; }
+    .ios-battery span { display: block; width: 86%; height: 100%; background: currentColor; border-radius: 1px; }
+    .ios-content { position: absolute; top: 54px; left: 0; right: 0; bottom: 34px; overflow: hidden; }
+    .ios-home { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 140px; height: 5px; background: rgba(255,255,255,0.5); border-radius: 999px; z-index: 10; }
+    .camera-app { height: 100%; background: var(--dc-bg); position: relative; overflow: hidden; }
+    .camera-app::before, .camera-app::after { content: ""; position: absolute; left: 0; right: 0; z-index: 4; pointer-events: none; }
+    .camera-app::before { top: 0; height: 130px; background: linear-gradient(180deg, rgba(5,6,8,0.88), transparent); }
+    .camera-app::after { bottom: 0; height: 230px; background: linear-gradient(0deg, rgba(5,6,8,0.94), transparent); }
+    .app-top { position: absolute; top: 18px; left: 18px; right: 18px; display: flex; justify-content: space-between; align-items: flex-start; z-index: 7; }
+    .app-title { font-weight: 700; letter-spacing: -0.04em; }
+    .rec-pill { display: inline-flex; align-items: center; gap: 7px; margin-top: 5px; padding: 6px 9px; border-radius: 999px; background: var(--dc-record-soft); color: var(--dc-record); font: 700 10px/1 var(--dc-mono); letter-spacing: 0.1em; }
+    .rec-dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; box-shadow: 0 0 14px currentColor; }
+    .top-actions { display: flex; gap: 8px; }
+    .round-control { width: 40px; height: 40px; border-radius: 999px; color: #fff; background: rgba(0,0,0,0.34); border: 1px solid rgba(255,255,255,0.14); backdrop-filter: blur(18px); }
+    .preview { position: absolute; inset: 0; overflow: hidden; background: #111; }
+    .feed { position: absolute; overflow: hidden; color: rgba(255,255,255,0.78); padding: 15px; font: 700 10px/1 var(--dc-mono); letter-spacing: 0.1em; text-transform: uppercase; display: flex; align-items: flex-end; }
+    .rear { background: linear-gradient(145deg, #263348 0%, #07080a 42%, #566a83 100%); }
+    .rear::before { content: ""; position: absolute; inset: -18%; background: radial-gradient(circle at 72% 28%, rgba(255,255,255,0.18), transparent 22%), linear-gradient(120deg, transparent 0 45%, rgba(214,255,77,0.10) 46% 48%, transparent 49%); }
+    .front { background: linear-gradient(145deg, #644231, #19110d 48%, #7a503d); box-shadow: 0 18px 46px rgba(0,0,0,0.38), inset 0 0 0 1px rgba(255,255,255,0.12); }
+    .front::before { content: ""; position: absolute; inset: -20%; background: radial-gradient(circle at 50% 28%, rgba(255,255,255,0.20), transparent 18%), radial-gradient(circle at 62% 54%, rgba(214,255,77,0.12), transparent 24%); }
+    .feed span { position: relative; z-index: 1; }
+    .layout-pip .rear, .layout-focusBack .rear { inset: 0; }
+    .layout-pip .front { width: 34%; height: 28%; right: 18px; top: 84px; border-radius: 24px; z-index: 3; border: 1px solid rgba(255,255,255,0.24); }
+    .layout-side .rear { inset: 0 50% 0 0; }
+    .layout-side .front { inset: 0 0 0 50%; }
+    .layout-topBottom .rear { inset: 0 0 50% 0; }
+    .layout-topBottom .front { inset: 50% 0 0 0; }
+    .layout-diagonal .rear { inset: 0; clip-path: polygon(0 0, 74% 0, 38% 100%, 0 100%); }
+    .layout-diagonal .front { inset: 0; clip-path: polygon(74% 0, 100% 0, 100% 100%, 38% 100%); }
+    .layout-focusBack .front { left: 18px; right: 18px; bottom: 118px; height: 19%; border-radius: 22px; z-index: 3; border: 1px solid rgba(255,255,255,0.22); }
+    .layout-focusFront .front { inset: 0; }
+    .layout-focusFront .rear { width: 34%; height: 28%; right: 18px; top: 84px; border-radius: 24px; z-index: 3; border: 1px solid rgba(255,255,255,0.24); }
+    .hud { position: absolute; top: 86px; left: 16px; display: flex; gap: 8px; z-index: 7; }
+    .hud span { padding: 6px 8px; border-radius: 999px; background: rgba(0,0,0,0.34); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.78); font: 700 10px/1 var(--dc-mono); letter-spacing: 0.08em; }
+    .layout-rail { position: absolute; left: 0; right: 0; bottom: 100px; display: flex; gap: 8px; overflow-x: auto; padding: 12px 14px 8px; z-index: 8; scrollbar-width: none; }
+    .layout-rail::-webkit-scrollbar { display: none; }
+    .layout-button { flex: 0 0 88px; padding: 7px; border-radius: 17px; text-align: left; color: rgba(255,255,255,0.62); background: rgba(5,6,8,0.46); border: 1px solid rgba(255,255,255,0.10); backdrop-filter: blur(18px); }
+    .layout-button.active { color: #fff; background: rgba(214,255,77,0.12); border-color: rgba(214,255,77,0.65); }
+    .mini { height: 42px; margin-bottom: 6px; border-radius: 11px; position: relative; overflow: hidden; background: rgba(255,255,255,0.12); }
+    .mini::before, .mini::after { content: ""; position: absolute; background: rgba(255,255,255,0.75); }
+    .mini.pip::before { inset: 0; } .mini.pip::after { width: 18px; height: 18px; right: 5px; top: 5px; border-radius: 5px; background: var(--dc-accent); }
+    .mini.side::before { inset: 0 52% 0 0; } .mini.side::after { inset: 0 0 0 52%; background: var(--dc-accent); }
+    .mini.topBottom::before { inset: 0 0 52% 0; } .mini.topBottom::after { inset: 52% 0 0 0; background: var(--dc-accent); }
+    .mini.diagonal::before { inset: 0; clip-path: polygon(0 0, 72% 0, 38% 100%, 0 100%); } .mini.diagonal::after { inset: 0; clip-path: polygon(72% 0, 100% 0, 100% 100%, 38% 100%); background: var(--dc-accent); }
+    .mini.focusBack::before { inset: 0 0 28% 0; } .mini.focusBack::after { inset: 76% 8px 8px; border-radius: 5px; background: var(--dc-accent); }
+    .mini.focusFront::before { inset: 0; background: var(--dc-accent); } .mini.focusFront::after { width: 18px; height: 18px; right: 5px; top: 5px; border-radius: 5px; background: rgba(255,255,255,0.8); }
+    .layout-button small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+    .capture-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; padding: 12px 18px 20px; display: grid; grid-template-columns: 64px 1fr 64px; align-items: center; gap: 12px; }
+    .capture-button { width: 76px; height: 76px; border-radius: 999px; justify-self: center; background: #fff; box-shadow: 0 0 0 5px var(--dc-bg), 0 0 0 7px rgba(255,255,255,0.72); position: relative; }
+    .capture-button::after { content: ""; position: absolute; inset: 23px; background: var(--dc-record); border-radius: 999px; transition: 180ms ease; }
+    .capture-button.recording::after { inset: 25px; border-radius: 8px; }
+    .ghost { height: 46px; border-radius: 999px; color: #fff; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.12); }
+    .gallery { width: 58px; height: 50px; border-radius: 18px; justify-self: end; background: linear-gradient(145deg, #252f3e, #0c0d10 54%, #6b4838); border: 1px solid rgba(255,255,255,0.18); position: relative; overflow: hidden; }
+    .gallery::after { content: ""; position: absolute; width: 16px; height: 16px; right: 9px; top: 9px; border-radius: 6px; background: var(--dc-accent); box-shadow: 0 0 0 2px rgba(0,0,0,0.38); }
+    @media (max-width: 1040px) {
+      .page { padding: 22px; }
+      .hero, .canvas, .asset-grid { grid-template-columns: 1fr; }
+      .phone-column { position: static; }
+      .steps { grid-template-columns: 1fr; }
+      .hero-proof { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useMemo, useState } = React;
+
+    const prototypeLayouts = [
+      { id: 'pip', label: '画中画', mini: 'pip', note: '默认 reaction 视角' },
+      { id: 'side', label: '左右分屏', mini: 'side', note: '对话 / 对比' },
+      { id: 'topBottom', label: '上下分屏', mini: 'topBottom', note: '竖屏分镜' },
+      { id: 'diagonal', label: '对角布局', mini: 'diagonal', note: '双现场张力' },
+      { id: 'focusBack', label: '后置主屏', mini: 'focusBack', note: '现场优先' },
+      { id: 'focusFront', label: '前置主屏', mini: 'focusFront', note: '讲述优先' }
+    ];
+
+    function IosFrame({ children }) {
+      return <div className="ios-wrapper"><div className="ios-screen">
+        <div className="ios-status"><span>9:41</span><div className="ios-icons"><div className="ios-signal"><i style={{height: 4}}/><i style={{height: 6}}/><i style={{height: 9}}/><i style={{height: 11}}/></div><svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M8 11.5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/><path d="M3 7.5a7 7 0 0110 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round"/><path d="M1 4.5a11 11 0 0114 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.7"/></svg><div className="ios-battery"><span /></div></div></div>
+        <div className="ios-island" />
+        <div className="ios-content">{children}</div>
+        <div className="ios-home" />
+      </div></div>;
+    }
+
+    function CameraSurface({ activeLayout, isRecording, setActiveLayout, setIsRecording }) {
+      const active = useMemo(() => prototypeLayouts.find(item => item.id === activeLayout), [activeLayout]);
+      return <div className={`camera-app layout-${activeLayout}`}>
+        <div className="preview">
+          <div className="feed rear"><span>REAR · 26mm</span></div>
+          <div className="feed front"><span>FRONT · SELF</span></div>
+        </div>
+        <div className="app-top">
+          <div><div className="app-title">DualCam</div><div className="rec-pill"><i className="rec-dot" />{isRecording ? 'REC 00:08' : 'READY'}</div></div>
+          <div className="top-actions"><button className="round-control">↯</button><button className="round-control">••</button></div>
+        </div>
+        <div className="hud"><span>{active.label}</span><span>1080P</span><span>SYNC</span></div>
+        <div className="layout-rail">
+          {prototypeLayouts.map(layout => <button key={layout.id} className={`layout-button ${layout.id === activeLayout ? 'active' : ''}`} onClick={() => setActiveLayout(layout.id)}>
+            <div className={`mini ${layout.mini}`} />
+            <small>{layout.label}</small>
+          </button>)}
+        </div>
+        <div className="capture-bar">
+          <button className="ghost">切换</button>
+          <button className={`capture-button ${isRecording ? 'recording' : ''}`} onClick={() => setIsRecording(!isRecording)} aria-label="toggle recording" />
+          <button className="gallery" aria-label="gallery" />
+        </div>
+      </div>;
+    }
+
+    function App() {
+      const [activeLayout, setActiveLayout] = useState('pip');
+      const [isRecording, setIsRecording] = useState(false);
+      const active = prototypeLayouts.find(item => item.id === activeLayout);
+      return <main className="page"><div className="shell">
+        <section className="hero">
+          <div>
+            <div className="brand-row"><img className="app-icon" src="assets/app-icon-1024.png" alt="DualCam App Icon" /><div><div className="eyebrow">DualCam iOS prototype</div><div style={{color: 'var(--dc-muted)', marginTop: 6}}>前后双视角，同步录制</div></div></div>
+            <h1>把完整现场一次录下来。</h1>
+            <p className="lead">DualCam 是面向创作者的双摄录像 App：后置记录现场，前置记录反应，六种布局在录制中也能切换，视频自动保存到系统相册。</p>
+            <div className="chip-row"><span className="chip">iOS 15+</span><span className="chip">AVFoundation</span><span className="chip">6 Layouts</span><span className="chip">1080p MP4</span><span className="chip">中英双语</span></div>
+          </div>
+          <div className="hero-proof"><div className="proof-card tall"><img src="assets/appstore-zh-01.png" alt="App Store screenshot" /><div className="proof-caption">App Store 主视觉</div></div><div className="proof-card wide"><img src="assets/website-product-zh.png" alt="Website product screenshot" /><div className="proof-caption">官网产品页视觉系统</div></div></div>
+        </section>
+        <section className="canvas">
+          <div className="phone-column"><div className="phone-label"><strong>Live capture surface</strong><span>{active.note}</span></div><IosFrame><CameraSurface activeLayout={activeLayout} isRecording={isRecording} setActiveLayout={setActiveLayout} setIsRecording={setIsRecording} /></IosFrame></div>
+          <div className="right-panel">
+            <section className="panel"><h2>拍摄优先，不把相机做成仪表盘。</h2><p>主界面保留最大取景器，布局模板、快门、相册入口都悬浮在画面之上。酸性荧光黄只用于当前选择和关键反馈，录制状态由红色与时间码承担。</p></section>
+            <section className="panel"><div className="steps"><div className="step"><div className="step-index">01</div><b>选择布局</b><span>画中画、分屏、对角和主屏模式都直接暴露在拍摄面。</span></div><div className="step"><div className="step-index">02</div><b>开始录制</b><span>前后双路画面保持同步，录制中仍可切换布局。</span></div><div className="step"><div className="step-index">03</div><b>保存到相册</b><span>输出 H.264 MP4，并写入系统相册，方便立刻分享。</span></div></div></section>
+            <section className="panel"><h2>本地设计资产复用</h2><div className="asset-grid"><div className="asset-tile large"><img src="assets/prototype-overview.png" alt="Prototype overview" /><div>主原型 overview</div></div><div style={{display: 'grid', gap: 14}}><div className="asset-tile"><img src="assets/max-main-frame-preview.png" alt="Max frame preview" /><div>最大画框方案</div></div><div className="asset-tile"><img src="assets/prototype-flow.png" alt="Prototype flow" /><div>核心流程图</div></div></div></div></section>
+          </div>
+        </section>
+      </div></main>;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

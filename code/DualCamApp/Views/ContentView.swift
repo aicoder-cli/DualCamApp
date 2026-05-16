@@ -98,7 +98,12 @@ struct ContentView: View {
             ZStack {
                 background
 
-                VStack(spacing: 18) {
+                previewCard(size: geometry.size)
+                    .ignoresSafeArea()
+
+                cameraChromeGradients
+
+                VStack(spacing: 0) {
                     DemoHeader(
                         isReady: cameraManager.isSessionRunning,
                         isRecording: isVideoRecording,
@@ -109,17 +114,17 @@ struct ContentView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 54)
 
-                    previewCard(size: geometry.size)
-
                     if videoRecorder.recordingState == .recording {
                         RecordingIndicator(duration: videoRecorder.recordedDurationString)
+                            .padding(.top, 14)
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
-                    Spacer(minLength: 8)
+                    Spacer()
 
-                    if cameraManager.isSessionRunning && showsRecordingChrome {
+                    if (cameraManager.isSessionRunning || cameraManager.didFinishStartupAttempt) && showsRecordingChrome {
                         LayoutToolbar(layoutManager: layoutManager)
+                            .padding(.bottom, 14)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
 
@@ -171,7 +176,7 @@ struct ContentView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                if !cameraManager.isSessionRunning && cameraManager.errorMessage == nil {
+                if !cameraManager.didFinishStartupAttempt && !cameraManager.isSessionRunning && cameraManager.errorMessage == nil {
                     LoadingOverlay(message: "camera.starting")
                 }
 
@@ -266,22 +271,36 @@ struct ContentView: View {
         }
     }
 
-    private func previewCard(size: CGSize) -> some View {
-        let regularHeight = max(360, size.height * 0.54)
-        let immersiveHeight = min(max(440, size.height * 0.70), size.height - 230)
-        let previewHeight = isImmersiveRecordingActive ? max(regularHeight, immersiveHeight) : regularHeight
+    private var cameraChromeGradients: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [Design.background.opacity(0.86), Design.background.opacity(0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 156)
 
-        return ZStack(alignment: .topLeading) {
+            Spacer()
+
+            LinearGradient(
+                colors: [Design.background.opacity(0), Design.background.opacity(0.92)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 250)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    private func previewCard(size: CGSize) -> some View {
+        ZStack(alignment: .topLeading) {
             DualCameraPreviewContainer(
                 cameraManager: cameraManager,
-                layoutManager: layoutManager
+                layoutManager: layoutManager,
+                didFinishStartupAttempt: cameraManager.didFinishStartupAttempt
             )
-            .clipShape(RoundedRectangle(cornerRadius: Design.radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Design.radius, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.42), radius: 28, x: 0, y: 18)
+            .frame(width: size.width, height: size.height)
 
             if showsRecordingChrome {
                 VStack(alignment: .leading, spacing: 4) {
@@ -296,7 +315,8 @@ struct ContentView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.84))
                 }
-                .padding(18)
+                .padding(.horizontal, 18)
+                .padding(.top, 118)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
@@ -315,16 +335,15 @@ struct ContentView: View {
 
             if captureMode == .photo {
                 LivePhotoToggle(isEnabled: $isLivePhotoEnabled)
-                    .padding(14)
+                    .padding(.top, 118)
+                    .padding(.trailing, 14)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing)))
             }
         }
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded { revealRecordingControls() })
-        .frame(height: previewHeight)
-        .padding(.horizontal, isImmersiveRecordingActive ? 8 : 18)
-        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isImmersiveRecordingActive)
+        .frame(width: size.width, height: size.height)
         .animation(.easeInOut(duration: 0.18), value: showsRecordingChrome)
     }
 
@@ -770,7 +789,7 @@ private struct CustomizationOverlay: View {
                     .stroke(Design.panelStroke, lineWidth: 1)
             )
             .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            .padding(.bottom, 214)
         }
     }
 }

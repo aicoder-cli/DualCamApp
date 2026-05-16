@@ -143,6 +143,7 @@ struct DualCameraPreviewContainer: View {
 
     @ObservedObject var cameraManager: CameraManager
     @ObservedObject var layoutManager: LayoutManager
+    var didFinishStartupAttempt = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -168,7 +169,11 @@ struct DualCameraPreviewContainer: View {
                 }
 
                 if !cameraManager.frontCameraReady && !cameraManager.backCameraReady {
-                    WaitingCameraView()
+                    if didFinishStartupAttempt {
+                        CameraUnavailableView()
+                    } else {
+                        WaitingCameraView()
+                    }
                 }
             }
             .clipped()
@@ -249,6 +254,26 @@ private struct WaitingCameraView: View {
             Text("camera.waiting")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.58))
+        }
+    }
+}
+
+private struct CameraUnavailableView: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "camera.slash")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundColor(Color(red: 0.84, green: 1.0, blue: 0.30))
+
+            Text("camera.unavailable.title")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+
+            Text("camera.unavailable.body")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.58))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 34)
         }
     }
 }

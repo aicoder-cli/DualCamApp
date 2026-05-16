@@ -34,6 +34,7 @@ class CameraManager: NSObject, ObservableObject {
     @Published var frontCameraReady = false
     @Published var backCameraReady = false
     @Published var errorMessage: String?
+    @Published var didFinishStartupAttempt = false
     @Published var hasMultiCameraSupport = false
     @Published var preferredFrameRate: Int32 = 30
     @Published var effectiveFrameRate: Int32 = 30
@@ -141,15 +142,20 @@ class CameraManager: NSObject, ObservableObject {
         case .authorized:
             return true
         case .notDetermined:
-            return await withCheckedContinuation { continuation in
+            let granted = await withCheckedContinuation { continuation in
                 AVCaptureDevice.requestAccess(for: .video) { granted in
                     continuation.resume(returning: granted)
                 }
             }
+            if !granted {
+                errorMessage = L10n.string("error.camera.permissionDenied")
+            }
+            return granted
         case .denied, .restricted:
             errorMessage = L10n.string("error.camera.permissionDenied")
             return false
         @unknown default:
+            errorMessage = L10n.string("error.camera.permissionDenied")
             return false
         }
     }
@@ -162,21 +168,30 @@ class CameraManager: NSObject, ObservableObject {
         case .authorized:
             return true
         case .notDetermined:
-            return await withCheckedContinuation { continuation in
+            let granted = await withCheckedContinuation { continuation in
                 AVCaptureDevice.requestAccess(for: .audio) { granted in
                     continuation.resume(returning: granted)
                 }
             }
+            if !granted {
+                errorMessage = L10n.string("error.microphone.permissionDenied")
+            }
+            return granted
         case .denied, .restricted:
             errorMessage = L10n.string("error.microphone.permissionDenied")
             return false
         @unknown default:
+            errorMessage = L10n.string("error.microphone.permissionDenied")
             return false
         }
     }
     
     /// 启动摄像头会话
     func startCapture() async {
+        didFinishStartupAttempt = false
+        errorMessage = nil
+        defer { didFinishStartupAttempt = true }
+
         guard await requestPermissions() else { return }
         guard await requestMicrophonePermission() else { return }
 
@@ -214,7 +229,7 @@ class CameraManager: NSObject, ObservableObject {
             }
 
             refreshVideoOrientations()
-            isSessionRunning = frontSession.isRunning || backSession.isRunning
+            isSessionRunning = (frontCameraReady && frontSession.isRunning) || (backCameraReady && backSession.isRunning)
         }
     }
 

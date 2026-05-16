@@ -13,6 +13,8 @@
 
 "camera.starting" = "正在启动摄像头...";
 "camera.waiting" = "等待摄像头…";
+"camera.unavailable.title" = "摄像头不可用";
+"camera.unavailable.body" = "可在模拟器中调试布局和界面；需要预览和录制摄像头时请在真机运行。";
 "camera.front" = "前置摄像头";
 "camera.back" = "后置摄像头";
 "camera.multiSupport" = "多摄像头支持";

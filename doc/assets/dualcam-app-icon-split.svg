@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="DualCam split app icon">
+  <defs>
+    <linearGradient id="bgPure" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0c10"/>
+      <stop offset="0.58" stop-color="#050608"/>
+      <stop offset="1" stop-color="#07080a"/>
+    </linearGradient>
+    <linearGradient id="bgSplit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#263348" stop-opacity="0.88"/>
+      <stop offset="0.46" stop-color="#050608"/>
+      <stop offset="1" stop-color="#19110d"/>
+    </linearGradient>
+    <linearGradient id="bgLens" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#11151d"/>
+      <stop offset="0.55" stop-color="#050608"/>
+      <stop offset="1" stop-color="#15100d"/>
+    </linearGradient>
+    <linearGradient id="limeDepth" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#efffa3"/>
+      <stop offset="0.42" stop-color="#d6ff4d"/>
+      <stop offset="1" stop-color="#9fc321"/>
+    </linearGradient>
+    <linearGradient id="diagonalShade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07080a" stop-opacity="0"/>
+      <stop offset="0.54" stop-color="#07080a" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#07080a" stop-opacity="0.34"/>
+    </linearGradient>
+    <filter id="acidGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="30" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.839 0 0 0 0 1 0 0 0 0 0.302 0 0 0 0.62 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="tightGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.839 0 0 0 0 1 0 0 0 0 0.302 0 0 0 0.42 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <radialGradient id="lensHighlight" cx="35%" cy="28%" r="62%">
+      <stop offset="0" stop-color="#2d3238"/>
+      <stop offset="0.42" stop-color="#07080a"/>
+      <stop offset="1" stop-color="#020304"/>
+    </radialGradient>
+
+    <symbol id="variant-pure" viewBox="0 0 1024 1024">
+      <rect width="1024" height="1024" fill="url(#bgPure)"/>
+      <circle cx="182" cy="132" r="268" fill="#d6ff4d" opacity="0.08"/>
+      <g filter="url(#acidGlow)">
+        <rect x="252" y="252" width="520" height="520" rx="162" fill="#d6ff4d"/>
+        <circle cx="382" cy="400" r="65" fill="#07080a"/>
+        <circle cx="642" cy="400" r="65" fill="#07080a"/>
+      </g>
+      <rect x="252" y="252" width="520" height="520" rx="162" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="10"/>
+    </symbol>
+
+    <symbol id="variant-split" viewBox="0 0 1024 1024">
+      <rect width="1024" height="1024" fill="#050608"/>
+      <path d="M0 0H760L402 1024H0Z" fill="url(#bgSplit)" opacity="0.82"/>
+      <path d="M760 0H1024V1024H402Z" fill="#19110d" opacity="0.7"/>
+      <path d="M742 0L388 1024" stroke="#d6ff4d" stroke-opacity="0.34" stroke-width="10"/>
+      <g filter="url(#tightGlow)">
+        <rect x="236" y="236" width="552" height="552" rx="172" fill="url(#limeDepth)"/>
+        <path d="M236 236H788L512 788H236Z" fill="#d6ff4d" opacity="0.94"/>
+        <path d="M788 236V788H512Z" fill="url(#diagonalShade)"/>
+        <circle cx="374" cy="394" r="69" fill="#07080a"/>
+        <circle cx="650" cy="394" r="69" fill="#07080a"/>
+      </g>
+      <path d="M236 236H788V788H236Z" rx="172" fill="none"/>
+      <rect x="236" y="236" width="552" height="552" rx="172" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="9"/>
+    </symbol>
+
+    <symbol id="variant-lens" viewBox="0 0 1024 1024">
+      <rect width="1024" height="1024" fill="url(#bgLens)"/>
+      <path d="M0 0H1024L666 1024H0Z" fill="#263348" opacity="0.16"/>
+      <path d="M666 1024L1024 0V1024Z" fill="#644231" opacity="0.18"/>
+      <g filter="url(#acidGlow)">
+        <rect x="232" y="232" width="560" height="560" rx="184" fill="url(#limeDepth)"/>
+        <path d="M282 742C386 586 494 428 742 282" stroke="#07080a" stroke-opacity="0.16" stroke-width="76" stroke-linecap="round"/>
+        <circle cx="372" cy="394" r="78" fill="url(#lensHighlight)"/>
+        <circle cx="652" cy="394" r="78" fill="url(#lensHighlight)"/>
+        <circle cx="348" cy="366" r="18" fill="#f5f5f7" opacity="0.16"/>
+        <circle cx="628" cy="366" r="18" fill="#f5f5f7" opacity="0.16"/>
+      </g>
+      <rect x="232" y="232" width="560" height="560" rx="184" fill="none" stroke="rgba(255,255,255,0.24)" stroke-width="10"/>
+    </symbol>
+  </defs>
+  <use href="#variant-split" x="0" y="0" width="1024" height="1024"/>
+</svg>

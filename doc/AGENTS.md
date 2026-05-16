@@ -23,22 +23,17 @@ purpose: Dual-camera video recording with customizable layouts
 ## File Structure
 
 ```
-DualCamApp/
-├── App/
-│   └── DualCamApp.swift     # @main entry point
-├── Managers/
-│   ├── CameraManager.swift             # AVCaptureSession management
-│   ├── VideoRecorder.swift             # AVAssetWriter recording
-│   └── LayoutManager.swift             # Layout state & calculations
-├── Views/
-│   ├── ContentView.swift               # Main view composition
-│   ├── CameraPreviewView.swift         # Preview layers & overlays
-│   └── LayoutSelectorView.swift        # Layout picker UI
-├── Resources/
-│   ├── Assets.xcassets/
-│   ├── en.lproj/                       # English strings and permission copy
-│   └── zh-Hans.lproj/                  # Simplified Chinese strings and permission copy
-└── Info.plist                          # Camera permissions
+code/
+├── DualCamApp/
+│   ├── App/
+│   │   └── DualCamApp.swift            # @main entry point
+│   ├── Managers/                       # AVCapture and layout managers
+│   ├── Views/                          # SwiftUI views
+│   ├── Resources/                      # Assets and localized strings
+│   └── Info.plist                      # Camera permissions
+├── DualCamAppTests/                    # Unit tests
+├── DualCamApp.xcodeproj
+└── DualCamApp.xctestplan
 ```
 
 ## Core Components
@@ -92,7 +87,7 @@ NSPhotoLibraryAddUsageDescription - Save videos to album
 Treat localization as part of every feature implementation.
 
 - Do not hard-code user-visible strings in SwiftUI views, managers, alerts, onboarding, settings, errors, or debug text shown to users.
-- Add every new display string to both `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings`.
+- Add every new display string to both `code/DualCamApp/Resources/en.lproj/Localizable.strings` and `code/DualCamApp/Resources/zh-Hans.lproj/Localizable.strings`.
 - Use `L10n.string(...)` for manager/error strings that are not automatically resolved by SwiftUI.
 - Keep enum raw values and identifiers stable; expose separate localized title and description keys for display copy.
 - Any new privacy permission requires an English default in `Info.plist` plus localized values in `en.lproj/InfoPlist.strings` and `zh-Hans.lproj/InfoPlist.strings`.
@@ -131,8 +126,8 @@ Treat localization as part of every feature implementation.
 
 ## Testing Notes
 
-- Unit tests: Not currently implemented
-- UI tests: Not currently implemented
+- Unit tests: `code/DualCamAppTests/`
+- Test plan: `code/DualCamApp.xctestplan`
 - Manual testing required on physical device for camera features
 
 ## Known Limitations

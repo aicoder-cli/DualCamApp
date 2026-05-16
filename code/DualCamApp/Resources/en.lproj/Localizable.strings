@@ -13,6 +13,8 @@
 
 "camera.starting" = "Starting camera...";
 "camera.waiting" = "Waiting for camera…";
+"camera.unavailable.title" = "Camera unavailable";
+"camera.unavailable.body" = "Use the simulator to adjust layouts and UI. Run on a real iPhone to preview and record cameras.";
 "camera.front" = "Front Camera";
 "camera.back" = "Back Camera";
 "camera.multiSupport" = "Multi-Camera Support";

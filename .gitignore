@@ -1,0 +1,7 @@
+.DS_Store
+.claude/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+doc/.video-tmp-*/
