@@ -157,8 +157,10 @@
   <script>
     window.__setTime = function () {};
     function start() {
-      document.body.classList.add('play');
       window.__ready = true;
+      setTimeout(function () {
+        document.body.classList.add('play');
+      }, 240);
     }
     requestAnimationFrame(start);
   </script>
