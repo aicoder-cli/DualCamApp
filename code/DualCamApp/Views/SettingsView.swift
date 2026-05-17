@@ -254,11 +254,13 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         SettingsSectionCard(titleKey: "settings.section.about") {
-            SettingsAboutCard(version: appVersionText)
-            SettingsStaticValueRow(titleKey: "settings.about.tutorial", subtitleKey: "settings.notAvailableYet") { EmptyView() }
-            SettingsStaticValueRow(titleKey: "settings.about.feedback", subtitleKey: "settings.notAvailableYet") { EmptyView() }
-            SettingsStaticValueRow(titleKey: "settings.about.privacy", subtitleKey: "settings.notAvailableYet") { EmptyView() }
-            SettingsStaticValueRow(titleKey: "settings.about.terms", subtitleKey: "settings.notAvailableYet") { EmptyView() }
+            SettingsNavigationRow(
+                titleKey: "settings.about.title",
+                subtitleKey: nil,
+                value: AnyView(Text(appVersionText))
+            ) {
+                SettingsAboutDetailView(version: appVersionText)
+            }
         }
     }
 
@@ -267,6 +269,12 @@ struct SettingsView: View {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
         return "\(version) (\(build))"
     }
+}
+
+private enum SettingsURL {
+    static let feedback = URL(string: "https://dualcam.pages.dev/feedback")!
+    static let privacy = URL(string: "https://dualcam.pages.dev/privacy")!
+    static let terms = URL(string: "https://dualcam.pages.dev/terms")!
 }
 
 private enum SettingsPalette {
@@ -438,6 +446,77 @@ private struct SettingsSwitchRow: View {
                 value: AnyView(SettingsToggle(isOn: isOn)),
                 showsChevron: false
             )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct SettingsAboutDetailView: View {
+    let version: String
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        SettingsBackground {
+            VStack(spacing: 0) {
+                SettingsDetailTopBar(dismiss: dismiss)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        SettingsAboutCard(version: version)
+
+                        VStack(spacing: 0) {
+                            SettingsAboutLinkRow(titleKey: "settings.about.feedback") {
+                                openURL(SettingsURL.feedback)
+                            }
+                            SettingsAboutLinkRow(titleKey: "settings.about.privacy") {
+                                openURL(SettingsURL.privacy)
+                            }
+                            SettingsAboutLinkRow(titleKey: "settings.about.terms") {
+                                openURL(SettingsURL.terms)
+                            }
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .fill(SettingsPalette.card)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .stroke(SettingsPalette.stroke, lineWidth: 1)
+                        )
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 28)
+                }
+            }
+        }
+        .navigationBarHidden(true)
+    }
+}
+
+private struct SettingsAboutLinkRow: View {
+    let titleKey: LocalizedStringKey
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text(titleKey)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(SettingsPalette.primaryText)
+                Spacer(minLength: 12)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(SettingsPalette.accent)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 54)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(SettingsPalette.divider)
+                    .frame(height: 1)
+                    .padding(.leading, 14)
+            }
         }
         .buttonStyle(.plain)
     }
@@ -723,15 +802,11 @@ private struct SettingsAboutCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("DC")
-                .font(.system(size: 20, weight: .black, design: .rounded))
-                .kerning(-1.4)
-                .foregroundColor(SettingsPalette.background)
+            Image("AppLogo")
+                .resizable()
+                .scaledToFit()
                 .frame(width: 58, height: 58)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(SettingsPalette.accent)
-                )
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("DualCam")

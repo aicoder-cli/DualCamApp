@@ -278,8 +278,8 @@
 "settings.photosPermissionDenied.title" = "Photos Permission Needed";
 "settings.photosPermissionDenied.message" = "Allow DualCam to add items to Photos in iOS Settings, or keep saving works only inside DualCam.";
 "settings.about.version" = "Version";
-"settings.about.tutorial" = "Tutorial";
-"settings.about.feedback" = "Feedback";
+"settings.about.title" = "About DualCam";
+"settings.about.feedback" = "User Feedback";
 "settings.about.privacy" = "Privacy Policy";
-"settings.about.terms" = "Terms";
+"settings.about.terms" = "Terms of Use";
 "settings.about.description" = "A simultaneous front and rear camera capture tool for reaction videos, interviews, and everyday clips.";

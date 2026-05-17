@@ -278,8 +278,8 @@
 "settings.photosPermissionDenied.title" = "需要相册权限";
 "settings.photosPermissionDenied.message" = "请在 iOS 设置中允许 DualCam 添加项目到相册，或仅保存到 DualCam 作品集。";
 "settings.about.version" = "版本";
-"settings.about.tutorial" = "教程";
-"settings.about.feedback" = "反馈";
+"settings.about.title" = "关于 DualCam";
+"settings.about.feedback" = "用户反馈";
 "settings.about.privacy" = "隐私政策";
-"settings.about.terms" = "条款";
+"settings.about.terms" = "使用条款";
 "settings.about.description" = "前后双摄同步拍摄工具，适合反应视频、采访和日常记录。";

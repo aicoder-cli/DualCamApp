@@ -119,13 +119,12 @@ final class LivePhotoRecorder: @unchecked Sendable {
         videoInput.markAsFinished()
         metadataInput?.markAsFinished()
 
-        let writer = assetWriter
         try await withCheckedThrowingContinuation { continuation in
-            writer.finishWriting {
-                if writer.status == .completed {
+            assetWriter.finishWriting { [self] in
+                if assetWriter.status == .completed {
                     continuation.resume()
                 } else {
-                    continuation.resume(throwing: writer.error ?? NSError(domain: "DualCamApp", code: -32, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.videoWriteFailed")]))
+                    continuation.resume(throwing: assetWriter.error ?? NSError(domain: "DualCamApp", code: -32, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.videoWriteFailed")]))
                 }
             }
         }

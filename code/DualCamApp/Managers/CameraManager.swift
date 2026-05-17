@@ -333,7 +333,6 @@ class CameraManager: NSObject, ObservableObject {
         }
 
         updateFrameRateDebugInfo()
-        print(frameRateDebugInfo)
     }
 
     private func resolveFrameRateSelection(
@@ -782,7 +781,6 @@ class CameraManager: NSObject, ObservableObject {
             device.videoZoomFactor = zoomFactor
             device.unlockForConfiguration()
         } catch {
-            print("设置缩放失败: \(error)")
         }
     }
     
@@ -806,7 +804,6 @@ class CameraManager: NSObject, ObservableObject {
             
             device.unlockForConfiguration()
         } catch {
-            print("设置对焦点失败: \(error)")
         }
     }
     
@@ -826,7 +823,6 @@ class CameraManager: NSObject, ObservableObject {
             
             device.unlockForConfiguration()
         } catch {
-            print("切换闪光灯失败: \(error)")
         }
     }
 }

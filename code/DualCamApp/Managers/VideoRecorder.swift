@@ -1054,7 +1054,6 @@ class VideoRecorder: ObservableObject {
     }
 
     private func reportWriterFailure(context: String) {
-        print(context)
         Task { @MainActor [weak self] in
             self?.errorMessage = context
         }
