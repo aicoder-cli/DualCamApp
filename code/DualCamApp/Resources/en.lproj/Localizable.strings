@@ -20,6 +20,15 @@
 "camera.multiSupport" = "Multi-Camera Support";
 "preview.cameraPreview" = "Camera Preview";
 
+"startup.hero.title" = "Front and rear cameras, ready together";
+"startup.hero.subtitle" = "DualCam is preparing your dual-camera workspace so you can capture both sides of the moment.";
+"startup.feature.dualCapture.title" = "Dual-camera preview";
+"startup.feature.dualCapture.body" = "See front and rear views at the same time before recording.";
+"startup.feature.layouts.title" = "Flexible layouts";
+"startup.feature.layouts.body" = "Switch between PiP, split screen, circle reaction, and more.";
+"startup.feature.quickRecord.title" = "Capture quickly";
+"startup.feature.quickRecord.body" = "Record video, take photos, and save works when the camera is ready.";
+
 "layout.templates" = "Templates";
 "layout.splitVertical.title" = "Vertical Split";
 "layout.splitHorizontal.title" = "Horizontal Split";

@@ -20,6 +20,15 @@
 "camera.multiSupport" = "多摄像头支持";
 "preview.cameraPreview" = "摄像头预览";
 
+"startup.hero.title" = "前后双摄，同步就绪";
+"startup.hero.subtitle" = "DualCam 正在准备双摄工作区，让你同时记录此刻的两面。";
+"startup.feature.dualCapture.title" = "双摄同屏预览";
+"startup.feature.dualCapture.body" = "录制前同时看到前置和后置画面。";
+"startup.feature.layouts.title" = "灵活画面布局";
+"startup.feature.layouts.body" = "可切换画中画、分屏、圆形反应等布局。";
+"startup.feature.quickRecord.title" = "快速拍摄记录";
+"startup.feature.quickRecord.body" = "摄像头就绪后即可录制视频、拍照并保存作品。";
+
 "layout.templates" = "模板";
 "layout.splitVertical.title" = "竖向分屏";
 "layout.splitHorizontal.title" = "横向分屏";

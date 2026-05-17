@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-05-17 - Startup loading experience
+
+### Added
+
+- Added a branded startup loading screen while DualCam prepares the camera session.
+- Added startup copy that highlights dual-camera preview, flexible layouts, and quick capture.
+- Added a dark static iOS launch screen with a smaller dedicated launch logo.
+
+### Changed
+
+- Replaced the simple camera loading overlay with a full-screen DualCam startup experience.
+- Kept the startup intro visible briefly so it does not flash past when camera startup is fast.
+
+### Verified
+
+- Generic iOS Release build completed successfully without launching the simulator.
+- `Info.plist`, launch asset JSON, and English/Simplified Chinese localization key parity were checked.
+
 ## 2026-05-15 - Recorded layout orientation fix
 
 ### Fixed

@@ -70,6 +70,7 @@ struct ContentView: View {
     @State private var captureMode: CaptureMode = .video
     @State private var hasAppliedInitialPreferences = false
     @State private var recordingControlsRevealed = false
+    @State private var hasShownStartupMinimumDuration = false
     @State private var hideControlsWorkItem: DispatchWorkItem?
     @AppStorage(SettingsKey.defaultLivePhotoDuration) private var defaultLivePhotoDuration: Double = 2.5
     @AppStorage(SettingsKey.shootingFrameRate) private var shootingFrameRate: Int = 30
@@ -90,6 +91,10 @@ struct ContentView: View {
 
     private var showsRecordingChrome: Bool {
         !isImmersiveRecordingActive || recordingControlsRevealed
+    }
+
+    private var shouldShowStartupLoading: Bool {
+        cameraManager.errorMessage == nil && (!hasShownStartupMinimumDuration || (!cameraManager.didFinishStartupAttempt && !cameraManager.isSessionRunning))
     }
 
     // MARK: - Body
@@ -176,8 +181,9 @@ struct ContentView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                if !cameraManager.didFinishStartupAttempt && !cameraManager.isSessionRunning && cameraManager.errorMessage == nil {
-                    LoadingOverlay(message: "camera.starting")
+                if shouldShowStartupLoading {
+                    StartupLoadingView()
+                        .transition(.opacity)
                 }
 
                 if showCustomizePanel {
@@ -191,6 +197,7 @@ struct ContentView: View {
         }
         .ignoresSafeArea()
         .onAppear {
+            hasShownStartupMinimumDuration = false
             configureRecordingHandlers()
             applyInitialPreferencesIfNeeded()
             updateRecordingLayoutSnapshot()
@@ -198,6 +205,10 @@ struct ContentView: View {
             Task<Void, Never> {
                 await cameraManager.setPreferredFrameRate(Int32(frameRate))
                 await cameraManager.startCapture()
+            }
+            Task<Void, Never> {
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                hasShownStartupMinimumDuration = true
             }
         }
         .onChange(of: shootingFrameRate) { frameRate in
@@ -865,56 +876,158 @@ struct ErrorBanner: View {
     }
 }
 
-// MARK: - 加载遮罩
+// MARK: - 启动等待页
 
-struct LoadingOverlay: View {
-
-    let message: LocalizedStringKey
+struct StartupLoadingView: View {
     @State private var isRotating = false
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.35)
-                .ignoresSafeArea()
-                .background(.ultraThinMaterial)
-                .environment(\.colorScheme, .dark)
+            Design.background.ignoresSafeArea()
 
-            VStack(spacing: 18) {
-                ZStack {
-                    Circle()
-                        .stroke(Color.white.opacity(0.15), lineWidth: 3)
-                        .frame(width: 48, height: 48)
+            RadialGradient(
+                colors: [Design.accent.opacity(0.26), .clear],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 380
+            )
+            .ignoresSafeArea()
 
-                    Circle()
-                        .trim(from: 0, to: 0.7)
-                        .stroke(
-                            AngularGradient(
-                                colors: [Design.accent.opacity(0.1), Design.accent, Design.accent.opacity(0.1)],
-                                center: .center
-                            ),
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                        )
-                        .frame(width: 48, height: 48)
-                        .rotationEffect(.degrees(isRotating ? 360 : 0))
+            RadialGradient(
+                colors: [Color.white.opacity(0.10), .clear],
+                center: .bottomLeading,
+                startRadius: 30,
+                endRadius: 460
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Spacer(minLength: 24)
+
+                VStack(spacing: 14) {
+                    Image("AppLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 60, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .shadow(color: Design.accent.opacity(0.20), radius: 20, x: 0, y: 8)
+
+                    VStack(spacing: 8) {
+                        Text("DualCam")
+                            .font(.system(size: 34, weight: .black, design: .rounded))
+                            .kerning(-1.8)
+                            .foregroundColor(.white)
+
+                        Text("startup.hero.title")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.92))
+
+                        Text("startup.hero.subtitle")
+                            .font(.system(size: 13, weight: .medium))
+                            .lineSpacing(2)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(Design.mutedText)
+                            .frame(maxWidth: 300)
+                    }
                 }
 
-                Text(message)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                VStack(spacing: 10) {
+                    StartupFeatureRow(
+                        iconName: "rectangle.on.rectangle.angled",
+                        titleKey: "startup.feature.dualCapture.title",
+                        bodyKey: "startup.feature.dualCapture.body"
+                    )
+                    StartupFeatureRow(
+                        iconName: "square.grid.2x2",
+                        titleKey: "startup.feature.layouts.title",
+                        bodyKey: "startup.feature.layouts.body"
+                    )
+                    StartupFeatureRow(
+                        iconName: "record.circle",
+                        titleKey: "startup.feature.quickRecord.title",
+                        bodyKey: "startup.feature.quickRecord.body"
+                    )
+                }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                )
+
+                Spacer(minLength: 18)
+
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.white.opacity(0.14), lineWidth: 3)
+                            .frame(width: 30, height: 30)
+
+                        Circle()
+                            .trim(from: 0, to: 0.68)
+                            .stroke(
+                                AngularGradient(
+                                    colors: [Design.accent.opacity(0.1), Design.accent, Design.accent.opacity(0.1)],
+                                    center: .center
+                                ),
+                                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                            )
+                            .frame(width: 30, height: 30)
+                            .rotationEffect(.degrees(isRotating ? 360 : 0))
+                    }
+
+                    Text("camera.starting")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.82))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Capsule().fill(Color.white.opacity(0.08)))
             }
-            .padding(28)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-                    .environment(\.colorScheme, .dark)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.2), radius: 16, x: 0, y: 8)
+            .padding(.horizontal, 24)
+            .padding(.top, 70)
+            .padding(.bottom, 42)
         }
+        .preferredColorScheme(.dark)
         .onAppear { withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) { isRotating = true } }
+    }
+}
+
+private struct StartupFeatureRow: View {
+    let iconName: String
+    let titleKey: LocalizedStringKey
+    let bodyKey: LocalizedStringKey
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: iconName)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(Design.accent)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Design.accent.opacity(0.12)))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(titleKey)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(bodyKey)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineSpacing(1)
+                    .foregroundColor(Design.mutedText)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.07))
+        )
     }
 }
 
