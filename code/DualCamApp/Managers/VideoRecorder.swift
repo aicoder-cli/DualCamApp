@@ -42,6 +42,7 @@ class VideoRecorder: ObservableObject {
     private var nextVideoFrameTime: CMTime?
     private var frontFrameTime: CMTime?
     private var backFrameTime: CMTime?
+    private var latestFramePresentationTime: CMTime?
 
     private var outputURL: URL?
     private let videoSize: CGSize
@@ -52,7 +53,16 @@ class VideoRecorder: ObservableObject {
     private let ciContext = CIContext()
     private var livePhotoRecorder: LivePhotoRecorder?
     private var isCapturingLivePhoto = false
+    private var isLivePhotoPrebufferingEnabled = false
+    private var livePhotoPrebufferDuration = CMTime(seconds: 1.25, preferredTimescale: 600)
     private var lastLivePhotoFrameTime: CMTime?
+    private var lastLivePhotoPrebufferFrameTime: CMTime?
+    private var livePhotoPrebuffer: [LivePhotoBufferedFrame] = []
+    private var isLivePhotoAudioPrebufferingEnabled = false
+    private var livePhotoAudioPrebufferDuration = CMTime(seconds: 1.25, preferredTimescale: 600)
+    private var livePhotoTimelineOrigin: CMTime?
+    private var livePhotoCaptureEndTime: CMTime?
+    private var livePhotoAudioPrebuffer: [LivePhotoBufferedAudioSample] = []
 
     var outputVideoSize: CGSize { videoSize }
     
@@ -66,6 +76,18 @@ class VideoRecorder: ObservableObject {
         let frontBuffer: CVPixelBuffer?
         let backBuffer: CVPixelBuffer?
         let snapshot: RecordingLayoutSnapshot?
+        let presentationTime: CMTime?
+    }
+
+    private struct LivePhotoBufferedFrame {
+        let pixelBuffer: CVPixelBuffer
+        let presentationTime: CMTime
+    }
+
+    private struct LivePhotoBufferedAudioSample {
+        let sampleBuffer: CMSampleBuffer
+        let presentationTime: CMTime
+        let endTime: CMTime
     }
 
     // 帧处理队列
@@ -218,14 +240,7 @@ class VideoRecorder: ObservableObject {
         )
         
         // 音频输入配置
-        let audioSettings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVNumberOfChannelsKey: 2,
-            AVSampleRateKey: 44100.0,
-            AVEncoderBitRateKey: 128000
-        ]
-        
-        audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+        audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: CaptureAudioSettings.aac)
         audioInput?.expectsMediaDataInRealTime = true
         
         guard let assetWriter, let videoInput else {
@@ -315,6 +330,30 @@ class VideoRecorder: ObservableObject {
         latestLayoutIdentifier = layout.rawValue
     }
 
+    func setLivePhotoPrebufferingEnabled(_ enabled: Bool, duration: TimeInterval) {
+        let preDuration = min(max(duration, 1.0) / 2.0, 1.5)
+        let prebufferDuration = CMTime(seconds: preDuration, preferredTimescale: 600)
+        processingQueue.async { [weak self] in
+            guard let self else { return }
+            self.isLivePhotoPrebufferingEnabled = enabled
+            self.livePhotoPrebufferDuration = prebufferDuration
+            if !enabled {
+                self.livePhotoPrebuffer.removeAll(keepingCapacity: true)
+                self.lastLivePhotoPrebufferFrameTime = nil
+            }
+        }
+        mediaWritingQueue.async { [weak self] in
+            guard let self else { return }
+            self.isLivePhotoAudioPrebufferingEnabled = enabled
+            self.livePhotoAudioPrebufferDuration = prebufferDuration
+            if !enabled {
+                self.livePhotoAudioPrebuffer.removeAll(keepingCapacity: true)
+                self.livePhotoTimelineOrigin = nil
+                self.livePhotoCaptureEndTime = nil
+            }
+        }
+    }
+
     private func updateFrameState(pixelBuffer: CVPixelBuffer, isFront: Bool, presentationTime: CMTime) -> CurrentFrameState {
         frameStateLock.lock()
         if isFront {
@@ -324,10 +363,12 @@ class VideoRecorder: ObservableObject {
             backFrameBuffer = pixelBuffer
             backFrameTime = presentationTime
         }
+        latestFramePresentationTime = presentationTime
         let state = CurrentFrameState(
             frontBuffer: frontFrameBuffer ?? backFrameBuffer,
             backBuffer: backFrameBuffer ?? frontFrameBuffer,
-            snapshot: latestLayoutSnapshot
+            snapshot: latestLayoutSnapshot,
+            presentationTime: latestFramePresentationTime
         )
         frameStateLock.unlock()
         return state
@@ -338,7 +379,8 @@ class VideoRecorder: ObservableObject {
         let state = CurrentFrameState(
             frontBuffer: frontFrameBuffer ?? backFrameBuffer,
             backBuffer: backFrameBuffer ?? frontFrameBuffer,
-            snapshot: latestLayoutSnapshot
+            snapshot: latestLayoutSnapshot,
+            presentationTime: latestFramePresentationTime
         )
         frameStateLock.unlock()
         return state
@@ -363,15 +405,28 @@ class VideoRecorder: ObservableObject {
 
                 guard let snapshot = frameState.snapshot else { return }
 
+                var livePhotoPixelBuffer: CVPixelBuffer?
+                if self.shouldAppendLivePhotoPrebufferFrame(at: presentationTime),
+                   let frontBuffer,
+                   let backBuffer,
+                   let pixelBuffer = self.renderCompositePixelBuffer(frontBuffer: frontBuffer, backBuffer: backBuffer, layoutSnapshot: snapshot) {
+                    livePhotoPixelBuffer = pixelBuffer
+                    self.appendLivePhotoPrebufferFrame(pixelBuffer, presentationTime: presentationTime)
+                }
+
                 if self.isCapturingLivePhoto,
                    self.shouldAppendLivePhotoFrame(at: presentationTime),
                    let livePhotoRecorder = self.livePhotoRecorder,
                    let frontBuffer,
-                   let backBuffer,
-                   let image = self.composeImages(frontBuffer: frontBuffer, backBuffer: backBuffer, layoutSnapshot: snapshot),
-                   let pixelBuffer = self.imageToPixelBuffer(image) {
-                    self.lastLivePhotoFrameTime = presentationTime
-                    livePhotoRecorder.appendVideoFrame(pixelBuffer, presentationTime: presentationTime)
+                   let backBuffer {
+                    let pixelBuffer = livePhotoPixelBuffer ?? self.renderCompositePixelBuffer(frontBuffer: frontBuffer, backBuffer: backBuffer, layoutSnapshot: snapshot)
+                    if let pixelBuffer {
+                        self.lastLivePhotoFrameTime = presentationTime
+                        nonisolated(unsafe) let livePhotoPixelBuffer = pixelBuffer
+                        self.mediaWritingQueue.async {
+                            livePhotoRecorder.appendVideoFrame(livePhotoPixelBuffer, presentationTime: presentationTime)
+                        }
+                    }
                 }
 
                 guard self.isRecording,
@@ -386,6 +441,26 @@ class VideoRecorder: ObservableObject {
                     )
                 }
             }
+        }
+    }
+
+    private func shouldAppendLivePhotoPrebufferFrame(at presentationTime: CMTime) -> Bool {
+        guard isLivePhotoPrebufferingEnabled else { return false }
+        guard presentationTime.isValid, presentationTime.isNumeric else { return false }
+        guard let lastLivePhotoPrebufferFrameTime else { return true }
+        return presentationTime - lastLivePhotoPrebufferFrameTime >= livePhotoFrameInterval
+    }
+
+    private func appendLivePhotoPrebufferFrame(_ pixelBuffer: CVPixelBuffer, presentationTime: CMTime) {
+        livePhotoPrebuffer.append(LivePhotoBufferedFrame(pixelBuffer: pixelBuffer, presentationTime: presentationTime))
+        lastLivePhotoPrebufferFrameTime = presentationTime
+        pruneLivePhotoPrebuffer(relativeTo: presentationTime)
+    }
+
+    private func pruneLivePhotoPrebuffer(relativeTo presentationTime: CMTime) {
+        let cutoff = presentationTime - livePhotoPrebufferDuration
+        livePhotoPrebuffer.removeAll { frame in
+            frame.presentationTime < cutoff
         }
     }
 
@@ -453,14 +528,14 @@ class VideoRecorder: ObservableObject {
         let captureDuration = min(max(duration, 1.0), 10.0)
 
         do {
-            let files = try await beginLivePhotoCapture()
-            try await Task.sleep(nanoseconds: UInt64(captureDuration * 1_000_000_000))
+            let capture = try await beginLivePhotoCapture(duration: captureDuration)
+            try await Task.sleep(nanoseconds: UInt64(capture.postDuration * 1_000_000_000))
             try await finishLivePhotoCapture()
             workCompletedHandler?(
                 RecordedWorkDraft(
                     kind: .photo,
-                    assetURL: files.photoURL,
-                    pairedVideoURL: files.movieURL,
+                    assetURL: capture.photoURL,
+                    pairedVideoURL: capture.movieURL,
                     createdAt: Date(),
                     duration: captureDuration,
                     layout: latestLayoutIdentifier,
@@ -470,7 +545,7 @@ class VideoRecorder: ObservableObject {
                 )
             )
             if saveToSystemPhotos {
-                await saveLivePhotoToPhotoLibrary(photoURL: files.photoURL, pairedVideoURL: files.movieURL)
+                await saveLivePhotoToPhotoLibrary(photoURL: capture.photoURL, pairedVideoURL: capture.movieURL)
             }
         } catch {
             await cancelLivePhotoCapture()
@@ -516,7 +591,7 @@ class VideoRecorder: ObservableObject {
         }
     }
 
-    private func beginLivePhotoCapture() async throws -> (photoURL: URL, movieURL: URL) {
+    private func beginLivePhotoCapture(duration captureDuration: TimeInterval) async throws -> (photoURL: URL, movieURL: URL, postDuration: TimeInterval) {
         try await withCheckedThrowingContinuation { continuation in
             processingQueue.async { [weak self] in
                 guard let self else {
@@ -526,35 +601,88 @@ class VideoRecorder: ObservableObject {
 
                 autoreleasepool {
                     let state = self.currentFrameState()
+                    let requestedPreDuration = min(captureDuration / 2.0, 1.5)
+                    let preDuration = CMTime(seconds: requestedPreDuration, preferredTimescale: 600)
 
-                    guard let frontBuffer = state.frontBuffer,
-                          let backBuffer = state.backBuffer,
-                          let snapshot = state.snapshot else {
+                    guard let shutterTime = self.livePhotoPrebuffer.last?.presentationTime ?? state.presentationTime,
+                          shutterTime.isValid,
+                          shutterTime.isNumeric else {
                         continuation.resume(throwing: NSError(domain: "DualCamApp", code: -41, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.camera.noFrameToSave")]))
                         return
                     }
 
-                    guard let image = self.composeImages(frontBuffer: frontBuffer, backBuffer: backBuffer, layoutSnapshot: snapshot) else {
+                    let cutoff = shutterTime - preDuration
+                    var preFrames = self.livePhotoPrebuffer.filter { frame in
+                        frame.presentationTime >= cutoff && frame.presentationTime <= shutterTime
+                    }
+
+                    if preFrames.isEmpty,
+                       let frontBuffer = state.frontBuffer,
+                       let backBuffer = state.backBuffer,
+                       let snapshot = state.snapshot,
+                       let pixelBuffer = self.renderCompositePixelBuffer(frontBuffer: frontBuffer, backBuffer: backBuffer, layoutSnapshot: snapshot) {
+                        preFrames = [LivePhotoBufferedFrame(pixelBuffer: pixelBuffer, presentationTime: shutterTime)]
+                    }
+
+                    guard !preFrames.isEmpty,
+                          let shutterFrame = preFrames.min(by: { first, second in
+                              abs((first.presentationTime - shutterTime).seconds) < abs((second.presentationTime - shutterTime).seconds)
+                          }) else {
                         continuation.resume(throwing: NSError(domain: "DualCamApp", code: -42, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillCompositionFailed")]))
                         return
                     }
 
-                    do {
-                        let assetIdentifier = UUID().uuidString
-                        let photoURL = self.makeLivePhotoStillOutputURL()
-                        let movieURL = self.makeLivePhotoMovieOutputURL()
-                        try LivePhotoRecorder.writeStillImage(image, to: photoURL, assetIdentifier: assetIdentifier)
-                        let recorder = try LivePhotoRecorder(
-                            movieURL: movieURL,
-                            videoSize: self.videoSize,
-                            assetIdentifier: assetIdentifier
-                        )
-                        self.livePhotoRecorder = recorder
-                        self.lastLivePhotoFrameTime = nil
-                        self.isCapturingLivePhoto = true
-                        continuation.resume(returning: (photoURL: photoURL, movieURL: movieURL))
-                    } catch {
-                        continuation.resume(throwing: error)
+                    let firstFrameTime = preFrames[0].presentationTime
+                    let rawStillImageTime = shutterFrame.presentationTime - firstFrameTime
+                    let stillImageTime = rawStillImageTime >= .zero ? rawStillImageTime : .zero
+                    let postDuration = max(0.25, captureDuration - stillImageTime.seconds)
+                    let captureEndTime = firstFrameTime + CMTime(seconds: captureDuration, preferredTimescale: 600)
+                    let assetIdentifier = UUID().uuidString
+                    let photoURL = self.makeLivePhotoStillOutputURL()
+                    let movieURL = self.makeLivePhotoMovieOutputURL()
+
+                    self.livePhotoRecorder = nil
+                    self.lastLivePhotoFrameTime = shutterTime
+                    self.isCapturingLivePhoto = true
+
+                    nonisolated(unsafe) let bufferedFrames = preFrames
+                    nonisolated(unsafe) let stillFrame = shutterFrame
+                    self.mediaWritingQueue.async { [weak self] in
+                        guard let self else { return }
+
+                        do {
+                            guard let image = self.pixelBufferToImage(stillFrame.pixelBuffer) else {
+                                throw NSError(domain: "DualCamApp", code: -42, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillCompositionFailed")])
+                            }
+
+                            try LivePhotoRecorder.writeStillImage(image, to: photoURL, assetIdentifier: assetIdentifier)
+                            let recorder = try LivePhotoRecorder(
+                                movieURL: movieURL,
+                                videoSize: self.videoSize,
+                                assetIdentifier: assetIdentifier,
+                                stillImageTime: stillImageTime
+                            )
+                            self.livePhotoTimelineOrigin = firstFrameTime
+                            self.livePhotoCaptureEndTime = captureEndTime
+                            bufferedFrames.forEach { frame in
+                                recorder.appendVideoFrame(frame.pixelBuffer, presentationTime: frame.presentationTime)
+                            }
+                            self.livePhotoAudioSamples(in: firstFrameTime...captureEndTime).forEach { sample in
+                                guard let retimedSample = Self.retimedAudioSampleBuffer(sample.sampleBuffer, timelineOrigin: firstFrameTime) else { return }
+                                recorder.appendAudioSampleBuffer(retimedSample)
+                            }
+
+                            self.processingQueue.async { [weak self] in
+                                guard let self else { return }
+                                self.livePhotoRecorder = recorder
+                                continuation.resume(returning: (photoURL: photoURL, movieURL: movieURL, postDuration: postDuration))
+                            }
+                        } catch {
+                            self.processingQueue.async { [weak self] in
+                                self?.isCapturingLivePhoto = false
+                                continuation.resume(throwing: error)
+                            }
+                        }
                     }
                 }
             }
@@ -576,6 +704,11 @@ class VideoRecorder: ObservableObject {
             }
         }
 
+        mediaWritingQueue.sync {
+            livePhotoTimelineOrigin = nil
+            livePhotoCaptureEndTime = nil
+        }
+
         try await recorder.finish()
     }
 
@@ -585,20 +718,28 @@ class VideoRecorder: ObservableObject {
                 self?.isCapturingLivePhoto = false
                 self?.livePhotoRecorder = nil
                 self?.lastLivePhotoFrameTime = nil
+                self?.mediaWritingQueue.async {
+                    self?.livePhotoTimelineOrigin = nil
+                    self?.livePhotoCaptureEndTime = nil
+                }
                 continuation.resume()
             }
         }
     }
 
     func processAudioSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
-        guard isRecording else { return }
+        guard isRecording || isLivePhotoPrebufferingEnabled || isCapturingLivePhoto else { return }
 
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        guard presentationTime.isValid, presentationTime.isNumeric else { return }
         nonisolated(unsafe) let audioSampleBuffer = sampleBuffer
 
         mediaWritingQueue.async { [weak self] in
-            guard let self,
-                  self.isRecording,
+            guard let self else { return }
+
+            self.handleLivePhotoAudioSample(audioSampleBuffer, presentationTime: presentationTime)
+
+            guard self.isRecording,
                   let audioInput = self.audioInput,
                   self.ensureSessionStarted(at: presentationTime) else { return }
 
@@ -609,6 +750,103 @@ class VideoRecorder: ObservableObject {
                 return
             }
         }
+    }
+
+    private func handleLivePhotoAudioSample(_ sampleBuffer: CMSampleBuffer, presentationTime: CMTime) {
+        if isLivePhotoAudioPrebufferingEnabled {
+            livePhotoAudioPrebuffer.append(
+                LivePhotoBufferedAudioSample(
+                    sampleBuffer: sampleBuffer,
+                    presentationTime: presentationTime,
+                    endTime: Self.audioSampleEndTime(sampleBuffer, presentationTime: presentationTime)
+                )
+            )
+            pruneLivePhotoAudioPrebuffer(relativeTo: presentationTime)
+        }
+
+        guard isCapturingLivePhoto,
+              let livePhotoRecorder,
+              let livePhotoTimelineOrigin,
+              let livePhotoCaptureEndTime,
+              Self.isAudioSample(presentationTime: presentationTime, within: livePhotoTimelineOrigin...livePhotoCaptureEndTime),
+              let retimedSample = Self.retimedAudioSampleBuffer(sampleBuffer, timelineOrigin: livePhotoTimelineOrigin) else { return }
+
+        livePhotoRecorder.appendAudioSampleBuffer(retimedSample)
+    }
+
+    private func pruneLivePhotoAudioPrebuffer(relativeTo presentationTime: CMTime) {
+        let cutoff = presentationTime - livePhotoAudioPrebufferDuration
+        livePhotoAudioPrebuffer.removeAll { sample in
+            sample.endTime < cutoff
+        }
+    }
+
+    private func livePhotoAudioSamples(in range: ClosedRange<CMTime>) -> [LivePhotoBufferedAudioSample] {
+        livePhotoAudioPrebuffer.filter { sample in
+            Self.isAudioSample(presentationTime: sample.presentationTime, within: range)
+        }
+    }
+
+    static func isAudioSample(presentationTime: CMTime, within range: ClosedRange<CMTime>) -> Bool {
+        presentationTime.isValid && presentationTime.isNumeric && range.contains(presentationTime)
+    }
+
+    static func audioSampleEndTime(_ sampleBuffer: CMSampleBuffer, presentationTime: CMTime) -> CMTime {
+        let duration = CMSampleBufferGetDuration(sampleBuffer)
+        guard duration.isValid, duration.isNumeric else { return presentationTime }
+        return presentationTime + duration
+    }
+
+    static func retimedAudioSampleBuffer(_ sampleBuffer: CMSampleBuffer, timelineOrigin: CMTime) -> CMSampleBuffer? {
+        guard timelineOrigin.isValid, timelineOrigin.isNumeric else { return nil }
+
+        var timingCount = 0
+        var status = CMSampleBufferGetSampleTimingInfoArray(
+            sampleBuffer,
+            entryCount: 0,
+            arrayToFill: nil,
+            entriesNeededOut: &timingCount
+        )
+        guard status == noErr, timingCount > 0 else { return nil }
+
+        var timing = Array(repeating: CMSampleTimingInfo(), count: timingCount)
+        status = timing.withUnsafeMutableBufferPointer { buffer in
+            CMSampleBufferGetSampleTimingInfoArray(
+                sampleBuffer,
+                entryCount: timingCount,
+                arrayToFill: buffer.baseAddress,
+                entriesNeededOut: nil
+            )
+        }
+        guard status == noErr else { return nil }
+
+        for index in timing.indices {
+            let presentationTime = timing[index].presentationTimeStamp
+            guard presentationTime.isValid, presentationTime.isNumeric else { return nil }
+            timing[index].presentationTimeStamp = presentationTime - timelineOrigin
+
+            let decodeTime = timing[index].decodeTimeStamp
+            if decodeTime.isValid, decodeTime.isNumeric {
+                timing[index].decodeTimeStamp = decodeTime - timelineOrigin
+            }
+        }
+
+        guard let firstPresentationTime = timing.first?.presentationTimeStamp,
+              firstPresentationTime >= .zero else { return nil }
+
+        var retimedSampleBuffer: CMSampleBuffer?
+        status = timing.withUnsafeBufferPointer { buffer in
+            CMSampleBufferCreateCopyWithNewTiming(
+                allocator: kCFAllocatorDefault,
+                sampleBuffer: sampleBuffer,
+                sampleTimingEntryCount: timingCount,
+                sampleTimingArray: buffer.baseAddress,
+                sampleBufferOut: &retimedSampleBuffer
+            )
+        }
+
+        guard status == noErr else { return nil }
+        return retimedSampleBuffer
     }
     
     /// 合成并写入帧

@@ -8,14 +8,25 @@ import ImageIO
 import UIKit
 import UniformTypeIdentifiers
 
+enum CaptureAudioSettings {
+    static let aac: [String: Any] = [
+        AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVNumberOfChannelsKey: 2,
+        AVSampleRateKey: 44100.0,
+        AVEncoderBitRateKey: 128000
+    ]
+}
+
 final class LivePhotoRecorder: @unchecked Sendable {
     private static let stillImageTimeIdentifier = AVMetadataIdentifier(rawValue: "mdta/com.apple.quicktime.still-image-time")
 
     private let assetWriter: AVAssetWriter
     private let videoInput: AVAssetWriterInput
+    private let audioInput: AVAssetWriterInput?
     private let metadataInput: AVAssetWriterInput?
     private let metadataAdaptor: AVAssetWriterInputMetadataAdaptor?
     private let pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor
+    private let stillImageTime: CMTime
 
     private let frameDuration = CMTime(value: 1, timescale: 30)
     private var firstPresentationTime: CMTime?
@@ -23,12 +34,13 @@ final class LivePhotoRecorder: @unchecked Sendable {
     private var hasStarted = false
     private var hasAppendedStillImageTime = false
 
-    init(movieURL: URL, videoSize: CGSize, assetIdentifier: String) throws {
+    init(movieURL: URL, videoSize: CGSize, assetIdentifier: String, stillImageTime: CMTime = .zero, includeAudio: Bool = true) throws {
         if FileManager.default.fileExists(atPath: movieURL.path) {
             try FileManager.default.removeItem(at: movieURL)
         }
 
         assetWriter = try AVAssetWriter(url: movieURL, fileType: .mov)
+        self.stillImageTime = stillImageTime
 
         let contentIdentifierItem = AVMutableMetadataItem()
         contentIdentifierItem.identifier = .quickTimeMetadataContentIdentifier
@@ -56,8 +68,21 @@ final class LivePhotoRecorder: @unchecked Sendable {
         }
         assetWriter.add(videoInput)
 
+        if includeAudio {
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: CaptureAudioSettings.aac)
+            input.expectsMediaDataInRealTime = true
+            if assetWriter.canAdd(input) {
+                assetWriter.add(input)
+                audioInput = input
+            } else {
+                audioInput = nil
+            }
+        } else {
+            audioInput = nil
+        }
+
         let sourceAttributes: [String: Any] = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: videoSize.width,
             kCVPixelBufferHeightKey as String: videoSize.height
         ]
@@ -111,12 +136,22 @@ final class LivePhotoRecorder: @unchecked Sendable {
         }
     }
 
+    func appendAudioSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
+        guard hasStarted,
+              assetWriter.status == .writing,
+              let audioInput,
+              audioInput.isReadyForMoreMediaData else { return }
+
+        audioInput.append(sampleBuffer)
+    }
+
     func finish() async throws {
         guard hasStarted else {
             throw NSError(domain: "DualCamApp", code: -31, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.noMotionFrames")])
         }
 
         videoInput.markAsFinished()
+        audioInput?.markAsFinished()
         metadataInput?.markAsFinished()
 
         try await withCheckedThrowingContinuation { continuation in
@@ -167,7 +202,7 @@ final class LivePhotoRecorder: @unchecked Sendable {
 
         let group = AVTimedMetadataGroup(
             items: [item],
-            timeRange: CMTimeRange(start: .zero, duration: CMTime(value: 1, timescale: 30))
+            timeRange: CMTimeRange(start: stillImageTime, duration: CMTime(value: 1, timescale: 30))
         )
         metadataAdaptor.append(group)
         hasAppendedStillImageTime = true

@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-05-17 - Sound and haptics feedback
+
+### Added
+
+- Connected the existing Sound & Haptics setting to photo capture, Live Photo shutter, recording start, and recording stop feedback.
+- Added a centralized capture feedback service for system haptics and lightweight capture sounds.
+- Added synchronized AAC audio to Live Photo motion movies, using the same zero-based timeline as the pre-shutter video buffer.
+- Added unit coverage for feedback event mapping, disabled setting behavior, and Live Photo audio timing.
+
+### Changed
+
+- Strengthened capture haptics so real-device feedback is more noticeable during photo capture and video recording.
+- Changed Live Photo capture to keep a short pre-shutter motion buffer, capture the still at the shutter moment, and continue recording post-shutter motion.
+- Retimed Live Photo audio samples to the same zero-based timeline as motion video while preserving normal video recording's original timestamp path.
+- Moved Live Photo shutter haptic feedback to the accepted shutter tap instead of waiting for the Live Photo file to finish saving.
+- Preserved full microphone audio at shutter time instead of dropping samples around capture feedback sounds.
+- Moved Live Photo still generation, writer setup, and prebuffer media appends off the shutter-time frame processing path, and skipped heavy post-shutter composition until the Live Photo writer is ready to reduce front-camera stalls around capture.
+
+### Verified
+
+- Generic iOS Release build completed successfully without launching the simulator.
+- Generic iOS test build completed successfully without launching the simulator.
+- Real-device capture validation remains required for hardware sound and haptic behavior.
+
 ## 2026-05-17 - Startup loading experience
 
 ### Added

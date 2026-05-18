@@ -60,6 +60,7 @@ struct ContentView: View {
     @StateObject private var layoutManager = LayoutManager()
     @StateObject private var videoRecorder = VideoRecorder()
     @StateObject private var worksManager = WorksManager()
+    @StateObject private var captureFeedback = CaptureFeedbackService()
 
     // MARK: - State Variables
     @State private var showSettings = false
@@ -80,6 +81,7 @@ struct ContentView: View {
     @AppStorage(SettingsKey.lastLayout) private var lastLayoutRaw = LayoutType.pictureInPicture.rawValue
     @AppStorage(SettingsKey.immersiveRecording) private var immersiveRecording = true
     @AppStorage(SettingsKey.controlRevealSeconds) private var controlRevealSeconds = ControlRevealDuration.twoSeconds.rawValue
+    @AppStorage(SettingsKey.soundAndHapticsEnabled) private var soundAndHapticsEnabled = true
 
     private var isVideoRecording: Bool {
         captureMode == .video && videoRecorder.recordingState == .recording
@@ -147,8 +149,10 @@ struct ContentView: View {
                                     await videoRecorder.startRecording(frameRate: cameraManager.effectiveFrameRate)
                                 }
                             } else {
+                                guard videoRecorder.recordingState == .idle else { return }
                                 let livePhotoEnabled = isLivePhotoEnabled
                                 let livePhotoDuration = min(max(defaultLivePhotoDuration, 1.0), 10.0)
+                                captureFeedback.perform(livePhotoEnabled ? .livePhotoShutterAccepted : .photoCaptured, enabled: soundAndHapticsEnabled)
                                 Task<Void, Never> {
                                     updateRecordingLayoutSnapshot()
                                     await videoRecorder.capturePhoto(
@@ -201,6 +205,7 @@ struct ContentView: View {
             configureRecordingHandlers()
             applyInitialPreferencesIfNeeded()
             updateRecordingLayoutSnapshot()
+            updateLivePhotoPrebuffering()
             let frameRate = shootingFrameRate
             Task<Void, Never> {
                 await cameraManager.setPreferredFrameRate(Int32(frameRate))
@@ -216,14 +221,22 @@ struct ContentView: View {
             Task<Void, Never> { await cameraManager.setPreferredFrameRate(Int32(frameRate)) }
         }
         .onChange(of: videoRecorder.recordingState) { state in
-            if state == .recording && isImmersiveRecordingActive {
-                hideRecordingControlsImmediately()
-            } else if state != .recording {
+            if state == .recording {
+                captureFeedback.perform(.recordingStarted, enabled: soundAndHapticsEnabled)
+                if isImmersiveRecordingActive {
+                    hideRecordingControlsImmediately()
+                }
+            } else {
                 resetRecordingControls()
             }
         }
+        .onChange(of: videoRecorder.errorMessage) { errorMessage in
+            guard errorMessage != nil else { return }
+            captureFeedback.perform(.captureFailed, enabled: soundAndHapticsEnabled)
+        }
         .onChange(of: captureMode) { _ in
             resetRecordingControls()
+            updateLivePhotoPrebuffering()
         }
         .onChange(of: immersiveRecording) { enabled in
             if enabled && isVideoRecording {
@@ -231,6 +244,12 @@ struct ContentView: View {
             } else {
                 resetRecordingControls()
             }
+        }
+        .onChange(of: isLivePhotoEnabled) { _ in
+            updateLivePhotoPrebuffering()
+        }
+        .onChange(of: defaultLivePhotoDuration) { _ in
+            updateLivePhotoPrebuffering()
         }
         .onChange(of: layoutManager.currentLayout) { layout in
             lastLayoutRaw = layout.rawValue
@@ -247,6 +266,7 @@ struct ContentView: View {
         .onChange(of: layoutManager.containerSize) { _ in updateRecordingLayoutSnapshot() }
         .onDisappear {
             resetRecordingControls()
+            videoRecorder.setLivePhotoPrebufferingEnabled(false, duration: defaultLivePhotoDuration)
             clearRecordingHandlers()
             cameraManager.stopCapture()
             hasAppliedInitialPreferences = false
@@ -391,9 +411,23 @@ struct ContentView: View {
         }
     }
 
+    private func updateLivePhotoPrebuffering() {
+        videoRecorder.setLivePhotoPrebufferingEnabled(
+            captureMode == .photo && isLivePhotoEnabled,
+            duration: min(max(defaultLivePhotoDuration, 1.0), 10.0)
+        )
+    }
+
+    private func completionFeedbackEvent(for draft: RecordedWorkDraft) -> CaptureFeedbackService.Event? {
+        draft.kind == .video ? .recordingStopped : nil
+    }
+
     private func configureRecordingHandlers() {
         videoRecorder.workCompletedHandler = { draft in
             worksManager.add(draft)
+            if let event = completionFeedbackEvent(for: draft) {
+                captureFeedback.perform(event, enabled: soundAndHapticsEnabled)
+            }
         }
 
         cameraManager.frontVideoFrameHandler = { sampleBuffer in
