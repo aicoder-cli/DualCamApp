@@ -6,6 +6,7 @@
 //
 
 @preconcurrency import AVFoundation
+import Combine
 import UIKit
 import ImageIO
 @preconcurrency import Photos
@@ -269,7 +270,6 @@ class VideoRecorder: ObservableObject {
                 let state = self.currentFrameState()
 
                 guard let frontBuffer = state.frontBuffer,
-                      let backBuffer = state.backBuffer,
                       let snapshot = state.snapshot else {
                     _ = self.makeOutputPixelBuffer(size: self.videoSize)
                     return
@@ -277,7 +277,7 @@ class VideoRecorder: ObservableObject {
 
                 _ = self.renderCompositePixelBuffer(
                     frontBuffer: frontBuffer,
-                    backBuffer: backBuffer,
+                    backBuffer: state.backBuffer,
                     layoutSnapshot: snapshot
                 )
             }
@@ -365,8 +365,8 @@ class VideoRecorder: ObservableObject {
         }
         latestFramePresentationTime = presentationTime
         let state = CurrentFrameState(
-            frontBuffer: frontFrameBuffer ?? backFrameBuffer,
-            backBuffer: backFrameBuffer ?? frontFrameBuffer,
+            frontBuffer: frontFrameBuffer,
+            backBuffer: backFrameBuffer,
             snapshot: latestLayoutSnapshot,
             presentationTime: latestFramePresentationTime
         )
@@ -377,13 +377,20 @@ class VideoRecorder: ObservableObject {
     private func currentFrameState() -> CurrentFrameState {
         frameStateLock.lock()
         let state = CurrentFrameState(
-            frontBuffer: frontFrameBuffer ?? backFrameBuffer,
-            backBuffer: backFrameBuffer ?? frontFrameBuffer,
+            frontBuffer: frontFrameBuffer,
+            backBuffer: backFrameBuffer,
             snapshot: latestLayoutSnapshot,
             presentationTime: latestFramePresentationTime
         )
         frameStateLock.unlock()
         return state
+    }
+
+    func clearBackFrameBuffer() {
+        frameStateLock.lock()
+        backFrameBuffer = nil
+        backFrameTime = nil
+        frameStateLock.unlock()
     }
 
     /// 处理视频帧
@@ -432,7 +439,7 @@ class VideoRecorder: ObservableObject {
                 guard self.isRecording,
                       let videoPresentationTime = self.nextVideoPresentationTime(for: presentationTime) else { return }
 
-                if let frontBuffer, let backBuffer {
+                if let frontBuffer {
                     self.composeAndWriteFrame(
                         frontBuffer: frontBuffer,
                         backBuffer: backBuffer,
@@ -567,13 +574,12 @@ class VideoRecorder: ObservableObject {
                     let state = self.currentFrameState()
 
                     guard let frontBuffer = state.frontBuffer,
-                          let backBuffer = state.backBuffer,
                           let snapshot = state.snapshot else {
                         continuation.resume(throwing: NSError(domain: "DualCamApp", code: -21, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.camera.noFrameToSave")]))
                         return
                     }
 
-                    guard let image = self.composeImages(frontBuffer: frontBuffer, backBuffer: backBuffer, layoutSnapshot: snapshot),
+                    guard let image = self.composeImages(frontBuffer: frontBuffer, backBuffer: state.backBuffer, layoutSnapshot: snapshot),
                           let imageData = image.jpegData(compressionQuality: 0.92) else {
                         continuation.resume(throwing: NSError(domain: "DualCamApp", code: -22, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.compositionFailed")]))
                         return
@@ -852,7 +858,7 @@ class VideoRecorder: ObservableObject {
     /// 合成并写入帧
     private func composeAndWriteFrame(
         frontBuffer: CVPixelBuffer,
-        backBuffer: CVPixelBuffer,
+        backBuffer: CVPixelBuffer?,
         layoutSnapshot: RecordingLayoutSnapshot,
         presentationTime: CMTime
     ) {
@@ -867,7 +873,7 @@ class VideoRecorder: ObservableObject {
 
     private func renderCompositePixelBuffer(
         frontBuffer: CVPixelBuffer,
-        backBuffer: CVPixelBuffer,
+        backBuffer: CVPixelBuffer?,
         layoutSnapshot: RecordingLayoutSnapshot
     ) -> CVPixelBuffer? {
         let outputSize = layoutSnapshot.outputSize
@@ -902,16 +908,27 @@ class VideoRecorder: ObservableObject {
         context.setFillColor(UIColor.black.cgColor)
         context.fill(CGRect(origin: .zero, size: outputSize))
 
-        guard let frontImage = sourceCGImage(from: frontBuffer),
-              let backImage = sourceCGImage(from: backBuffer) else { return nil }
+        guard let frontImage = sourceCGImage(from: frontBuffer) else { return nil }
 
-        let layers = [
-            (image: backImage, layout: layoutSnapshot.back),
-            (image: frontImage, layout: layoutSnapshot.front)
-        ].sorted { $0.layout.zIndex < $1.layout.zIndex }
+        if let backBuffer,
+           let backImage = sourceCGImage(from: backBuffer) {
+            let layers = [
+                (image: backImage, layout: layoutSnapshot.back),
+                (image: frontImage, layout: layoutSnapshot.front)
+            ].sorted { $0.layout.zIndex < $1.layout.zIndex }
 
-        for layer in layers {
-            draw(layer.image, sourceSize: CGSize(width: layer.image.width, height: layer.image.height), layout: layer.layout, in: context)
+            for layer in layers {
+                draw(layer.image, sourceSize: CGSize(width: layer.image.width, height: layer.image.height), layout: layer.layout, in: context)
+            }
+        } else {
+            let fullFrameLayout = CameraLayoutInfo(
+                frame: CGRect(origin: .zero, size: outputSize),
+                zIndex: 1,
+                cornerRadius: 0,
+                showBorder: false,
+                clipShape: .rectangle
+            )
+            draw(frontImage, sourceSize: CGSize(width: frontImage.width, height: frontImage.height), layout: fullFrameLayout, in: context)
         }
 
         return outputPixelBuffer
@@ -1011,13 +1028,11 @@ class VideoRecorder: ObservableObject {
     /// 合成两个摄像头图像
     private func composeImages(
         frontBuffer: CVPixelBuffer,
-        backBuffer: CVPixelBuffer,
+        backBuffer: CVPixelBuffer?,
         layoutSnapshot: RecordingLayoutSnapshot
     ) -> UIImage? {
-        let frontImage = displayImage(from: frontBuffer)
-        let backImage = displayImage(from: backBuffer)
-
-        guard let front = frontImage, let back = backImage else { return nil }
+        guard let front = displayImage(from: frontBuffer) else { return nil }
+        let back = backBuffer.flatMap { displayImage(from: $0) }
 
         UIGraphicsBeginImageContextWithOptions(layoutSnapshot.outputSize, false, 1.0)
         defer { UIGraphicsEndImageContext() }
@@ -1025,13 +1040,17 @@ class VideoRecorder: ObservableObject {
         UIColor.black.setFill()
         UIRectFill(CGRect(origin: .zero, size: layoutSnapshot.outputSize))
 
-        let layers = [
-            (image: back, layout: layoutSnapshot.back),
-            (image: front, layout: layoutSnapshot.front)
-        ].sorted { $0.layout.zIndex < $1.layout.zIndex }
+        if let back {
+            let layers = [
+                (image: back, layout: layoutSnapshot.back),
+                (image: front, layout: layoutSnapshot.front)
+            ].sorted { $0.layout.zIndex < $1.layout.zIndex }
 
-        for layer in layers {
-            draw(layer.image, layout: layer.layout)
+            for layer in layers {
+                draw(layer.image, layout: layer.layout)
+            }
+        } else {
+            front.draw(in: CGRect(origin: .zero, size: layoutSnapshot.outputSize))
         }
 
         return UIGraphicsGetImageFromCurrentImageContext()

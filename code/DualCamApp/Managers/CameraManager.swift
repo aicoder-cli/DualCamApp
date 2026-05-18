@@ -6,6 +6,7 @@
 //
 
 @preconcurrency import AVFoundation
+import Combine
 import UIKit
 
 /// 摄像头类型
@@ -23,6 +24,39 @@ struct CameraConfiguration {
     var input: AVCaptureDeviceInput?
     var output: AVCaptureVideoDataOutput?
     var connection: AVCaptureConnection?
+}
+
+enum CameraDeviceSelection {
+    static let frontDeviceTypes: [AVCaptureDevice.DeviceType] = [
+        .builtInWideAngleCamera,
+        .builtInUltraWideCamera,
+        .builtInTrueDepthCamera
+    ]
+
+    static func frontCameraDeviceTypeRank(_ deviceType: AVCaptureDevice.DeviceType) -> Int {
+        switch deviceType {
+        case .builtInWideAngleCamera:
+            return 300
+        case .builtInUltraWideCamera:
+            return 200
+        case .builtInTrueDepthCamera:
+            return 100
+        default:
+            return 0
+        }
+    }
+
+    static func isSupportedFrontCameraDeviceType(_ deviceType: AVCaptureDevice.DeviceType) -> Bool {
+        frontCameraDeviceTypeRank(deviceType) > 0
+    }
+
+    static func isMultiCamCameraReady(hasOutputConnection: Bool, hasPreviewConnection: Bool) -> Bool {
+        hasOutputConnection && hasPreviewConnection
+    }
+
+    static func isSingleSessionCameraReady(didAddInput: Bool, didAddOutput: Bool, hasVideoConnection: Bool) -> Bool {
+        didAddInput && didAddOutput && hasVideoConnection
+    }
 }
 
 enum RearLensKind: String, CaseIterable {
@@ -232,6 +266,8 @@ class CameraManager: NSObject, ObservableObject {
         let reason: String
     }
 
+    private let frontDeviceTypes: [AVCaptureDevice.DeviceType] = CameraDeviceSelection.frontDeviceTypes
+
     private let rearDeviceTypes: [AVCaptureDevice.DeviceType] = [
         .builtInTripleCamera,
         .builtInDualWideCamera,
@@ -249,6 +285,11 @@ class CameraManager: NSObject, ObservableObject {
     nonisolated(unsafe) private var backFPSWindowStart: CMTime?
     nonisolated(unsafe) private var frontFPSFrameCount = 0
     nonisolated(unsafe) private var backFPSFrameCount = 0
+    nonisolated(unsafe) private var isIPadDelayedRearStartupActive = false
+    nonisolated(unsafe) private var iPadFrontFramesSinceStartup = 0
+    nonisolated(unsafe) private var iPadLastFrontFrameTime: TimeInterval = 0
+    nonisolated(unsafe) private var iPadRearStartupRequested = false
+    nonisolated(unsafe) private var iPadRearFallbackTriggered = false
 
     // 视频帧回调
     nonisolated(unsafe) var frontVideoFrameHandler: ((CMSampleBuffer) -> Void)?
@@ -266,39 +307,48 @@ class CameraManager: NSObject, ObservableObject {
     /// 设置摄像头配置
     private func setupCameras() {
         // 检查多摄像头支持
-        let discoverySession = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInWideAngleCamera] + rearDeviceTypes.filter { $0 != .builtInWideAngleCamera },
-            mediaType: .video,
-            position: .unspecified
-        )
-        
-        let frontDevices = discoverySession.devices.filter { $0.position == .front }
-        let backDevices = discoverySession.devices.filter { $0.position == .back }
+        let frontDevices = availableFrontCameraDevices()
+        let backDevices = availableBackCameraDevices()
 
-        hasMultiCameraSupport = AVCaptureMultiCamSession.isMultiCamSupported && !frontDevices.isEmpty && !backDevices.isEmpty
-        
-        // 创建预览层
-        let frontPreviewLayer: AVCaptureVideoPreviewLayer
-        let backPreviewLayer: AVCaptureVideoPreviewLayer
+        hasMultiCameraSupport = supportsMultiCamCapture && !frontDevices.isEmpty && !backDevices.isEmpty
 
-        if AVCaptureMultiCamSession.isMultiCamSupported {
-            frontPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: multiCamSession)
-            backPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: multiCamSession)
+        if hasMultiCameraSupport {
+            configureMultiCamPreviewLayers()
         } else {
-            frontPreviewLayer = AVCaptureVideoPreviewLayer(session: frontSession)
-            backPreviewLayer = AVCaptureVideoPreviewLayer(session: backSession)
+            configureSeparateSessionPreviewLayers()
         }
+    }
 
+    private func configureMultiCamPreviewLayers() {
+        let frontPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: multiCamSession)
+        let backPreviewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: multiCamSession)
+        configurePreviewLayers(frontPreviewLayer: frontPreviewLayer, backPreviewLayer: backPreviewLayer)
+    }
+
+    private func configureSeparateSessionPreviewLayers() {
+        let frontPreviewLayer = AVCaptureVideoPreviewLayer(session: frontSession)
+        let backPreviewLayer = AVCaptureVideoPreviewLayer(session: backSession)
+        hasMultiCameraSupport = false
+        frontCameraReady = false
+        backCameraReady = false
+        isFrontCameraConfigured = false
+        isBackCameraConfigured = false
+        _frontVideoOutput = nil
+        _backVideoOutput = nil
+        configurePreviewLayers(frontPreviewLayer: frontPreviewLayer, backPreviewLayer: backPreviewLayer)
+    }
+
+    private func configurePreviewLayers(frontPreviewLayer: AVCaptureVideoPreviewLayer, backPreviewLayer: AVCaptureVideoPreviewLayer) {
         frontPreviewLayer.videoGravity = .resizeAspectFill
         backPreviewLayer.videoGravity = .resizeAspectFill
-        
+
         // 配置前后摄像头
         frontCamera = CameraConfiguration(
             type: .front,
             position: .front,
             previewLayer: frontPreviewLayer
         )
-        
+
         backCamera = CameraConfiguration(
             type: .back,
             position: .back,
@@ -370,43 +420,157 @@ class CameraManager: NSObject, ObservableObject {
         if hasMultiCameraSupport {
             await setupMultiCamSession()
 
-            let multiCamSession = multiCamSession
-            await withCheckedContinuation { continuation in
-                sessionQueue.async {
-                    if !multiCamSession.isRunning {
-                        multiCamSession.startRunning()
+            if isMultiCamConfigured && frontCameraReady && backCameraReady {
+                let multiCamSession = multiCamSession
+                await withCheckedContinuation { continuation in
+                    sessionQueue.async {
+                        if !multiCamSession.isRunning {
+                            multiCamSession.startRunning()
+                        }
+                        continuation.resume()
                     }
-                    continuation.resume()
                 }
-            }
-            refreshVideoOrientations()
-            isSessionRunning = multiCamSession.isRunning
-        } else {
-            await setupFrontCamera()
-            await setupBackCamera()
-            await setupAudio()
-
-            let frontSession = frontSession
-            let backSession = backSession
-            await withCheckedContinuation { continuation in
-                sessionQueue.async {
-                    if !frontSession.isRunning {
-                        frontSession.startRunning()
-                    }
-                    if !backSession.isRunning {
-                        backSession.startRunning()
-                    }
-                    continuation.resume()
-                }
+                refreshVideoOrientations()
+                isSessionRunning = multiCamSession.isRunning
+                return
             }
 
-            refreshVideoOrientations()
-            isSessionRunning = (frontCameraReady && frontSession.isRunning) || (backCameraReady && backSession.isRunning)
+            configureSeparateSessionPreviewLayers()
+            errorMessage = nil
         }
+
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            await startIPadFrontFirstCapture()
+            return
+        }
+
+        await setupFrontCamera()
+        await setupBackCamera()
+        await setupAudio()
+
+        let frontSession = frontSession
+        let backSession = backSession
+        await withCheckedContinuation { continuation in
+            sessionQueue.async {
+                if !frontSession.isRunning {
+                    frontSession.startRunning()
+                }
+                if !backSession.isRunning {
+                    backSession.startRunning()
+                }
+                continuation.resume()
+            }
+        }
+
+        refreshVideoOrientations()
+        isSessionRunning = (frontCameraReady && frontSession.isRunning) || (backCameraReady && backSession.isRunning)
+    }
+
+    private func startIPadFrontFirstCapture() async {
+        await setupFrontCamera()
+        await setupAudio(on: frontSession)
+        resetIPadDelayedRearStartupState()
+
+        let frontSession = frontSession
+        await withCheckedContinuation { continuation in
+            sessionQueue.async {
+                if !frontSession.isRunning {
+                    frontSession.startRunning()
+                }
+                continuation.resume()
+            }
+        }
+
+        backCameraReady = false
+        refreshVideoOrientations()
+        isSessionRunning = frontCameraReady && frontSession.isRunning
+    }
+
+    private func resetIPadDelayedRearStartupState() {
+        isIPadDelayedRearStartupActive = false
+        iPadFrontFramesSinceStartup = 0
+        iPadLastFrontFrameTime = 0
+        iPadRearStartupRequested = false
+        iPadRearFallbackTriggered = false
+    }
+
+    private func startDelayedIPadRearCaptureIfNeeded() async {
+        guard UIDevice.current.userInterfaceIdiom == .pad,
+              isIPadDelayedRearStartupActive,
+              iPadRearStartupRequested,
+              !iPadRearFallbackTriggered,
+              frontCameraReady,
+              frontSession.isRunning,
+              !backSession.isRunning else { return }
+
+        await setupBackCamera()
+
+        let backSession = backSession
+        await withCheckedContinuation { continuation in
+            sessionQueue.async {
+                if !backSession.isRunning {
+                    backSession.startRunning()
+                }
+                continuation.resume()
+            }
+        }
+
+        let rearStartTime = Date.timeIntervalSinceReferenceDate
+        backCameraReady = false
+        refreshVideoOrientations()
+        isSessionRunning = frontCameraReady && frontSession.isRunning
+        scheduleIPadRearStartupValidation(rearStartTime: rearStartTime, hasShownRearPreview: false)
+    }
+
+    private func scheduleIPadRearStartupValidation(rearStartTime: TimeInterval, hasShownRearPreview: Bool) {
+        let delay: UInt64 = hasShownRearPreview ? 600_000_000 : 1_200_000_000
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            await self?.validateDelayedIPadRearStartup(rearStartTime: rearStartTime, hasShownRearPreview: hasShownRearPreview)
+        }
+    }
+
+    private func validateDelayedIPadRearStartup(rearStartTime: TimeInterval, hasShownRearPreview: Bool) async {
+        guard UIDevice.current.userInterfaceIdiom == .pad,
+              isIPadDelayedRearStartupActive,
+              !iPadRearFallbackTriggered,
+              backSession.isRunning else { return }
+
+        guard iPadLastFrontFrameTime > rearStartTime else {
+            await fallbackToIPadFrontOnlyAfterRearStartup()
+            return
+        }
+
+        backCameraReady = false
+        refreshVideoOrientations()
+        isSessionRunning = frontCameraReady && frontSession.isRunning
+    }
+
+    private func fallbackToIPadFrontOnlyAfterRearStartup() async {
+        guard !iPadRearFallbackTriggered else { return }
+
+        iPadRearFallbackTriggered = true
+
+        let backSession = backSession
+        await withCheckedContinuation { continuation in
+            sessionQueue.async {
+                if backSession.isRunning {
+                    backSession.stopRunning()
+                }
+                continuation.resume()
+            }
+        }
+
+        backCameraReady = false
+        frontCameraReady = frontSession.isRunning
+        refreshVideoOrientations()
+        isSessionRunning = frontCameraReady && frontSession.isRunning
     }
 
     /// 停止摄像头会话
     func stopCapture() {
+        isIPadDelayedRearStartupActive = false
+        iPadRearStartupRequested = false
         let frontSession = frontSession
         let backSession = backSession
         let multiCamSession = multiCamSession
@@ -651,6 +815,43 @@ class CameraManager: NSObject, ObservableObject {
         )
     }
 
+    private func preferredFrontCameraDevices() -> [AVCaptureDevice] {
+        availableFrontCameraDevices().sorted { frontCameraDeviceRank($0) > frontCameraDeviceRank($1) }
+    }
+
+    private func availableFrontCameraDevices() -> [AVCaptureDevice] {
+        let defaults = frontDeviceTypes.compactMap { AVCaptureDevice.default($0, for: .video, position: .front) }
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: frontDeviceTypes,
+            mediaType: .video,
+            position: .front
+        )
+        return (defaults + discoverySession.devices).reduce(into: [AVCaptureDevice]()) { devices, device in
+            if !devices.contains(where: { $0.uniqueID == device.uniqueID }) {
+                devices.append(device)
+            }
+        }
+    }
+
+    private var supportsMultiCamCapture: Bool {
+        AVCaptureMultiCamSession.isMultiCamSupported && UIDevice.current.userInterfaceIdiom != .pad
+    }
+
+    private func frontCameraDeviceRank(_ device: AVCaptureDevice) -> Int {
+        var rank = CameraDeviceSelection.frontCameraDeviceTypeRank(device.deviceType)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            switch device.deviceType {
+            case .builtInUltraWideCamera:
+                rank += 200
+            case .builtInTrueDepthCamera:
+                rank += 100
+            default:
+                break
+            }
+        }
+        return rank
+    }
+
     private func preferredBackCameraDevices() -> [AVCaptureDevice] {
         availableBackCameraDevices().sorted { backCameraDeviceRank($0) > backCameraDeviceRank($1) }
     }
@@ -848,19 +1049,30 @@ class CameraManager: NSObject, ObservableObject {
         guard !isMultiCamConfigured else { return }
 
         do {
-            guard let frontDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
+            guard !preferredFrontCameraDevices().isEmpty else {
                 errorMessage = L10n.string("error.camera.frontNotFound")
                 return
             }
 
             multiCamSession.beginConfiguration()
 
-            let frontInput = try AVCaptureDeviceInput(device: frontDevice)
-            guard multiCamSession.canAddInput(frontInput) else {
+            var selectedFrontDevice: AVCaptureDevice?
+            var selectedFrontInput: AVCaptureDeviceInput?
+            for candidate in preferredFrontCameraDevices() {
+                let input = try AVCaptureDeviceInput(device: candidate)
+                if multiCamSession.canAddInput(input) {
+                    selectedFrontDevice = candidate
+                    selectedFrontInput = input
+                    break
+                }
+            }
+
+            guard let frontDevice = selectedFrontDevice, let frontInput = selectedFrontInput else {
                 multiCamSession.commitConfiguration()
                 errorMessage = L10n.string("error.camera.cannotAddFrontInput")
                 return
             }
+
             multiCamSession.addInputWithNoConnections(frontInput)
             frontCamera.device = frontDevice
             frontCamera.input = frontInput
@@ -920,17 +1132,24 @@ class CameraManager: NSObject, ObservableObject {
                 return
             }
 
+            var didAddFrontOutputConnection = false
+            var didAddFrontPreviewConnection = false
+            var didAddBackOutputConnection = false
+            var didAddBackPreviewConnection = false
+
             let frontOutputConnection = AVCaptureConnection(inputPorts: [frontPort], output: frontOutput)
             if multiCamSession.canAddConnection(frontOutputConnection) {
                 multiCamSession.addConnection(frontOutputConnection)
                 frontCamera.connection = frontOutputConnection
                 configureVideoConnection(frontOutputConnection, cameraType: .front)
+                didAddFrontOutputConnection = true
             }
 
             let frontPreviewConnection = AVCaptureConnection(inputPort: frontPort, videoPreviewLayer: frontCamera.previewLayer)
             if multiCamSession.canAddConnection(frontPreviewConnection) {
                 multiCamSession.addConnection(frontPreviewConnection)
                 configureVideoConnection(frontPreviewConnection, cameraType: .front)
+                didAddFrontPreviewConnection = true
             }
 
             let backOutputConnection = AVCaptureConnection(inputPorts: [backPort], output: backOutput)
@@ -938,12 +1157,28 @@ class CameraManager: NSObject, ObservableObject {
                 multiCamSession.addConnection(backOutputConnection)
                 backCamera.connection = backOutputConnection
                 configureVideoConnection(backOutputConnection, cameraType: .back)
+                didAddBackOutputConnection = true
             }
 
             let backPreviewConnection = AVCaptureConnection(inputPort: backPort, videoPreviewLayer: backCamera.previewLayer)
             if multiCamSession.canAddConnection(backPreviewConnection) {
                 multiCamSession.addConnection(backPreviewConnection)
                 configureVideoConnection(backPreviewConnection, cameraType: .back)
+                didAddBackPreviewConnection = true
+            }
+
+            let frontReady = CameraDeviceSelection.isMultiCamCameraReady(
+                hasOutputConnection: didAddFrontOutputConnection,
+                hasPreviewConnection: didAddFrontPreviewConnection
+            )
+            let backReady = CameraDeviceSelection.isMultiCamCameraReady(
+                hasOutputConnection: didAddBackOutputConnection,
+                hasPreviewConnection: didAddBackPreviewConnection
+            )
+            guard frontReady && backReady else {
+                multiCamSession.commitConfiguration()
+                errorMessage = L10n.string("error.camera.cannotConnect")
+                return
             }
 
             if let audioDevice = AVCaptureDevice.default(for: .audio) {
@@ -988,7 +1223,7 @@ class CameraManager: NSObject, ObservableObject {
         guard !isFrontCameraConfigured else { return }
 
         do {
-            guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
+            guard !preferredFrontCameraDevices().isEmpty else {
                 errorMessage = L10n.string("error.camera.frontNotFound")
                 return
             }
@@ -996,15 +1231,27 @@ class CameraManager: NSObject, ObservableObject {
             frontSession.beginConfiguration()
             frontSession.sessionPreset = .hd1280x720
 
-            frontCamera.device = device
-            applyPreferredFrameRateIfPossible()
-
-            let input = try AVCaptureDeviceInput(device: device)
-            frontCamera.input = input
-
-            if frontSession.canAddInput(input) {
-                frontSession.addInput(input)
+            var selectedDevice: AVCaptureDevice?
+            var selectedInput: AVCaptureDeviceInput?
+            for candidate in preferredFrontCameraDevices() {
+                let input = try AVCaptureDeviceInput(device: candidate)
+                if frontSession.canAddInput(input) {
+                    selectedDevice = candidate
+                    selectedInput = input
+                    break
+                }
             }
+
+            guard let device = selectedDevice, let input = selectedInput else {
+                frontSession.commitConfiguration()
+                errorMessage = L10n.string("error.camera.cannotAddFrontInput")
+                return
+            }
+
+            frontSession.addInput(input)
+            frontCamera.device = device
+            frontCamera.input = input
+            applyPreferredFrameRateIfPossible()
 
             let videoOutput = AVCaptureVideoDataOutput()
             videoOutput.setSampleBufferDelegate(self, queue: frontVideoDataOutputQueue)
@@ -1013,21 +1260,30 @@ class CameraManager: NSObject, ObservableObject {
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
             ]
 
+            guard frontSession.canAddOutput(videoOutput) else {
+                frontSession.commitConfiguration()
+                errorMessage = L10n.string("error.camera.cannotAddFrontOutput")
+                return
+            }
+            frontSession.addOutput(videoOutput)
             frontCamera.output = videoOutput
             _frontVideoOutput = videoOutput
 
-            if frontSession.canAddOutput(videoOutput) {
-                frontSession.addOutput(videoOutput)
+            guard let connection = videoOutput.connection(with: .video) else {
+                frontSession.commitConfiguration()
+                errorMessage = L10n.string("error.camera.cannotConnect")
+                return
             }
-
-            if let connection = videoOutput.connection(with: .video) {
-                frontCamera.connection = connection
-                configureVideoConnection(connection, cameraType: .front)
-            }
+            frontCamera.connection = connection
+            configureVideoConnection(connection, cameraType: .front)
 
             frontSession.commitConfiguration()
-            isFrontCameraConfigured = true
-            frontCameraReady = true
+            isFrontCameraConfigured = CameraDeviceSelection.isSingleSessionCameraReady(
+                didAddInput: true,
+                didAddOutput: true,
+                hasVideoConnection: true
+            )
+            frontCameraReady = isFrontCameraConfigured
 
         } catch {
             frontSession.commitConfiguration()
@@ -1072,21 +1328,30 @@ class CameraManager: NSObject, ObservableObject {
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
             ]
 
+            guard backSession.canAddOutput(videoOutput) else {
+                backSession.commitConfiguration()
+                errorMessage = L10n.string("error.camera.cannotAddBackOutput")
+                return
+            }
+            backSession.addOutput(videoOutput)
             backCamera.output = videoOutput
             _backVideoOutput = videoOutput
 
-            if backSession.canAddOutput(videoOutput) {
-                backSession.addOutput(videoOutput)
+            guard let connection = videoOutput.connection(with: .video) else {
+                backSession.commitConfiguration()
+                errorMessage = L10n.string("error.camera.cannotConnect")
+                return
             }
-
-            if let connection = videoOutput.connection(with: .video) {
-                backCamera.connection = connection
-                configureVideoConnection(connection, cameraType: .back)
-            }
+            backCamera.connection = connection
+            configureVideoConnection(connection, cameraType: .back)
 
             backSession.commitConfiguration()
-            isBackCameraConfigured = true
-            backCameraReady = true
+            isBackCameraConfigured = CameraDeviceSelection.isSingleSessionCameraReady(
+                didAddInput: true,
+                didAddOutput: true,
+                hasVideoConnection: true
+            )
+            backCameraReady = isBackCameraConfigured
 
         } catch {
             backSession.commitConfiguration()
@@ -1095,6 +1360,10 @@ class CameraManager: NSObject, ObservableObject {
     }
 
     private func setupAudio() async {
+        await setupAudio(on: backSession)
+    }
+
+    private func setupAudio(on session: AVCaptureSession) async {
         guard !isAudioConfigured else { return }
 
         do {
@@ -1103,12 +1372,12 @@ class CameraManager: NSObject, ObservableObject {
                 return
             }
 
-            backSession.beginConfiguration()
+            session.beginConfiguration()
 
             let input = try AVCaptureDeviceInput(device: device)
             audioInput = input
-            if backSession.canAddInput(input) {
-                backSession.addInput(input)
+            if session.canAddInput(input) {
+                session.addInput(input)
             }
 
             let output = AVCaptureAudioDataOutput()
@@ -1116,15 +1385,15 @@ class CameraManager: NSObject, ObservableObject {
             audioOutput = output
             _audioOutput = output
 
-            if backSession.canAddOutput(output) {
-                backSession.addOutput(output)
+            if session.canAddOutput(output) {
+                session.addOutput(output)
             }
 
-            backSession.commitConfiguration()
+            session.commitConfiguration()
             isAudioConfigured = true
 
         } catch {
-            backSession.commitConfiguration()
+            session.commitConfiguration()
             errorMessage = L10n.string("error.microphone.setupFailed", error.localizedDescription)
         }
     }
@@ -1249,6 +1518,21 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         }
     }
 
+    nonisolated private func noteIPadFrontFrame() {
+        guard isIPadDelayedRearStartupActive else { return }
+
+        iPadLastFrontFrameTime = Date.timeIntervalSinceReferenceDate
+        guard !iPadRearStartupRequested, !iPadRearFallbackTriggered else { return }
+
+        iPadFrontFramesSinceStartup += 1
+        guard iPadFrontFramesSinceStartup >= 3 else { return }
+
+        iPadRearStartupRequested = true
+        Task { @MainActor [weak self] in
+            await self?.startDelayedIPadRearCaptureIfNeeded()
+        }
+    }
+
     nonisolated private func updateMeasuredFrameRate(
         timestamp: CMTime,
         windowStart: inout CMTime?,
@@ -1279,6 +1563,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
 
         if output === frontRef {
             trackMeasuredFrameRate(sampleBuffer: sampleBuffer, isFront: true)
+            noteIPadFrontFrame()
             frontVideoFrameHandler?(sampleBuffer)
         } else if output === backRef {
             trackMeasuredFrameRate(sampleBuffer: sampleBuffer, isFront: false)

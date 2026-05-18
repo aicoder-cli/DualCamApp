@@ -245,6 +245,11 @@ struct ContentView: View {
         .onChange(of: cameraManager.rearZoomFactor) { zoomFactor in
             lastRearFocalLength = Double(zoomFactor)
         }
+        .onChange(of: cameraManager.backCameraReady) { isReady in
+            if !isReady {
+                videoRecorder.clearBackFrameBuffer()
+            }
+        }
         .onChange(of: videoRecorder.recordingState) { state in
             if state == .recording {
                 captureFeedback.perform(.recordingStarted, enabled: soundAndHapticsEnabled)

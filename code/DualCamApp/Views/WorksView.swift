@@ -1,4 +1,5 @@
 import AVKit
+import Combine
 import Photos
 import SwiftUI
 import UIKit
@@ -192,6 +193,7 @@ struct WorksView: View {
                                     isSelected: selectedIDs.contains(item.id),
                                     isSelecting: true
                                 )
+                                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                             }
                             .buttonStyle(.plain)
                         } else {
@@ -201,12 +203,13 @@ struct WorksView: View {
                                 }
                             }) {
                                 WorkCard(item: item)
+                                    .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                             }
                             .buttonStyle(.plain)
                         }
                     }
                 }
-                .padding(.bottom, 24)
+                .padding(.bottom, isSelecting ? 116 : 24)
             }
         }
     }
@@ -398,6 +401,8 @@ private struct WorkCard: View {
             }
         }
         .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.white.opacity(0.07))

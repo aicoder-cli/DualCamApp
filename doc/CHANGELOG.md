@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-05-18 - iPad front camera compatibility
+
+### Fixed
+
+- Added front camera discovery for iPad Ultra Wide and TrueDepth front cameras instead of assuming every front camera is Wide Angle.
+- Aligned preview layer setup with the actual capture path so fallback sessions do not bind previews to the multi-cam session.
+- Added runtime fallback from failed multi-cam configuration to separate front/back sessions instead of starting an unconnected multi-cam preview.
+- Routed iPad capture through separate front/back sessions and preferred iPad Ultra Wide/TrueDepth front cameras to avoid multi-cam combinations that connect but render black.
+- Started iPad capture with the front session first instead of launching front and back sessions together, avoiding rear-session contention on older iPads.
+- Disabled the delayed iPad rear-camera startup experiment after real-device testing showed that even hidden rear probing can make the front preview unavailable on older iPads.
+- Tightened camera readiness reporting so missing output or preview connections are not shown as ready camera previews.
+- Stopped substituting the rear camera frame when the front recording stream has not delivered frames, preventing saved videos from masking a missing front stream.
+- Allowed front-only iPad capture to write front-camera photos and videos while rear capture is disabled for compatibility.
+
 ## 2026-05-18 - Works browsing interaction
 
 ### Changed

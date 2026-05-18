@@ -7,32 +7,33 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A11111110000000000000001 /* DualCamApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000001 /* DualCamApp.swift */; };
-		A11111110000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000002 /* ContentView.swift */; };
-		A11111110000000000000003 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000003 /* CameraManager.swift */; };
-		A11111110000000000000004 /* VideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000004 /* VideoRecorder.swift */; };
-		A11111110000000000000005 /* LayoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000005 /* LayoutManager.swift */; };
-		A11111110000000000000006 /* CameraPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000006 /* CameraPreviewView.swift */; };
-		A11111110000000000000007 /* LayoutSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000007 /* LayoutSelectorView.swift */; };
-		A11111110000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000008 /* Assets.xcassets */; };
-		A11111110000000000000009 /* LivePhotoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000010 /* LivePhotoRecorder.swift */; };
-		A1111111000000000000000A /* QuickStartOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000A /* QuickStartOnboardingView.swift */; };
-		A1111111000000000000000B /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000B /* AppLanguage.swift */; };
-		A1111111000000000000000C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000E /* Localizable.strings */; };
-		A1111111000000000000000D /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000012 /* InfoPlist.strings */; };
-		A1111111000000000000000E /* WorksManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000013 /* WorksManager.swift */; };
-		A1111111000000000000000F /* WorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000014 /* WorksView.swift */; };
-		A11111110000000000000010 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000015 /* AppSettings.swift */; };
-		A11111110000000000000011 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000016 /* SettingsView.swift */; };
-		A11111110000000000000012 /* WorksPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000017 /* WorksPresentation.swift */; };
-			A11111110000000000000013 /* CaptureFeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000018 /* CaptureFeedbackService.swift */; };
 		A11111110000000000000020 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000021 /* TestSupport.swift */; };
 		A11111110000000000000021 /* LayoutManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000022 /* LayoutManagerTests.swift */; };
 		A11111110000000000000022 /* AppSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000023 /* AppSettingsTests.swift */; };
 		A11111110000000000000023 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000024 /* LocalizationTests.swift */; };
 		A11111110000000000000024 /* WorksPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000025 /* WorksPresentationTests.swift */; };
-			A11111110000000000000025 /* CaptureFeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000026 /* CaptureFeedbackServiceTests.swift */; };
-			A11111110000000000000026 /* LivePhotoAudioTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000028 /* LivePhotoAudioTimingTests.swift */; };
+		A11111110000000000000025 /* CaptureFeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000026 /* CaptureFeedbackServiceTests.swift */; };
+		A11111110000000000000026 /* LivePhotoAudioTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000028 /* LivePhotoAudioTimingTests.swift */; };
+		A11111110000000000000027 /* CameraDeviceSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000029 /* CameraDeviceSelectionTests.swift */; };
+		A11111110000000000000101 /* DualCamApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000001 /* DualCamApp.swift */; };
+		A11111110000000000000102 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000002 /* ContentView.swift */; };
+		A11111110000000000000103 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000003 /* CameraManager.swift */; };
+		A11111110000000000000104 /* VideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000004 /* VideoRecorder.swift */; };
+		A11111110000000000000105 /* LayoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000005 /* LayoutManager.swift */; };
+		A11111110000000000000106 /* CameraPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000006 /* CameraPreviewView.swift */; };
+		A11111110000000000000107 /* LayoutSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000007 /* LayoutSelectorView.swift */; };
+		A11111110000000000000108 /* QuickStartOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000A /* QuickStartOnboardingView.swift */; };
+		A11111110000000000000109 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000B /* AppLanguage.swift */; };
+		A11111110000000000000110 /* LivePhotoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000010 /* LivePhotoRecorder.swift */; };
+		A11111110000000000000111 /* WorksManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000013 /* WorksManager.swift */; };
+		A11111110000000000000112 /* WorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000014 /* WorksView.swift */; };
+		A11111110000000000000113 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000015 /* AppSettings.swift */; };
+		A11111110000000000000114 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000016 /* SettingsView.swift */; };
+		A11111110000000000000115 /* WorksPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000017 /* WorksPresentation.swift */; };
+		A11111110000000000000116 /* CaptureFeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000018 /* CaptureFeedbackService.swift */; };
+		A11111110000000000000117 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000008 /* Assets.xcassets */; };
+		A11111110000000000000118 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000E /* Localizable.strings */; };
+		A11111110000000000000119 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000012 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,13 +41,13 @@
 			isa = PBXContainerItemProxy;
 			containerPortal = A17777770000000000000001 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = A15555550000000000000001;
+			remoteGlobalIDString = 932C545C2FBB02E600BC5378;
 			remoteInfo = DualCamApp;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A12222220000000000000000 /* DualCamApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DualCamApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		932C545D2FBB02E600BC5378 /* DualCamApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DualCamApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A12222220000000000000001 /* DualCamApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualCamApp.swift; sourceTree = "<group>"; };
 		A12222220000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A12222220000000000000003 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
@@ -68,20 +69,21 @@
 		A12222220000000000000015 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		A12222220000000000000016 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A12222220000000000000017 /* WorksPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksPresentation.swift; sourceTree = "<group>"; };
-			A12222220000000000000018 /* CaptureFeedbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFeedbackService.swift; sourceTree = "<group>"; };
+		A12222220000000000000018 /* CaptureFeedbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFeedbackService.swift; sourceTree = "<group>"; };
 		A12222220000000000000020 /* DualCamAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DualCamAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A12222220000000000000021 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		A12222220000000000000022 /* LayoutManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutManagerTests.swift; sourceTree = "<group>"; };
 		A12222220000000000000023 /* AppSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsTests.swift; sourceTree = "<group>"; };
 		A12222220000000000000024 /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
 		A12222220000000000000025 /* WorksPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksPresentationTests.swift; sourceTree = "<group>"; };
-			A12222220000000000000026 /* CaptureFeedbackServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFeedbackServiceTests.swift; sourceTree = "<group>"; };
-			A12222220000000000000028 /* LivePhotoAudioTimingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoAudioTimingTests.swift; sourceTree = "<group>"; };
+		A12222220000000000000026 /* CaptureFeedbackServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFeedbackServiceTests.swift; sourceTree = "<group>"; };
 		A12222220000000000000027 /* DualCamApp.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = DualCamApp.xctestplan; sourceTree = "<group>"; };
+		A12222220000000000000028 /* LivePhotoAudioTimingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoAudioTimingTests.swift; sourceTree = "<group>"; };
+		A12222220000000000000029 /* CameraDeviceSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraDeviceSelectionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A13333330000000000000001 /* Frameworks */ = {
+		932C545A2FBB02E600BC5378 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -123,8 +125,8 @@
 		A14444440000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A12222220000000000000000 /* DualCamApp.app */,
 				A12222220000000000000020 /* DualCamAppTests.xctest */,
+				932C545D2FBB02E600BC5378 /* DualCamApp.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -186,6 +188,7 @@
 				A12222220000000000000025 /* WorksPresentationTests.swift */,
 				A12222220000000000000026 /* CaptureFeedbackServiceTests.swift */,
 				A12222220000000000000028 /* LivePhotoAudioTimingTests.swift */,
+				A12222220000000000000029 /* CameraDeviceSelectionTests.swift */,
 			);
 			path = DualCamAppTests;
 			sourceTree = "<group>";
@@ -193,21 +196,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A15555550000000000000001 /* DualCamApp */ = {
+		932C545C2FBB02E600BC5378 /* DualCamApp */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A16666660000000000000003 /* Build configuration list for PBXNativeTarget "DualCamApp" */;
+			buildConfigurationList = 932C54652FBB02E800BC5378 /* Build configuration list for PBXNativeTarget "DualCamApp" */;
 			buildPhases = (
-				A15555550000000000000002 /* Sources */,
-				A13333330000000000000001 /* Frameworks */,
-				A15555550000000000000003 /* Resources */,
+				932C54592FBB02E600BC5378 /* Sources */,
+				932C545A2FBB02E600BC5378 /* Frameworks */,
+				932C545B2FBB02E600BC5378 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			name = DualCamApp;
+			packageProductDependencies = (
+			);
 			productName = DualCamApp;
-			productReference = A12222220000000000000000 /* DualCamApp.app */;
+			productReference = 932C545D2FBB02E600BC5378 /* DualCamApp.app */;
 			productType = "com.apple.product-type.application";
 		};
 		A15555550000000000000004 /* DualCamAppTests */ = {
@@ -221,7 +226,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				A15555550000000000000007 /* PBXTargetDependency */,
+				A19999990000000000000002 /* PBXTargetDependency */,
 			);
 			name = DualCamAppTests;
 			productName = DualCamAppTests;
@@ -235,15 +240,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1500;
+				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
-					A15555550000000000000001 = {
-						CreatedOnToolsVersion = 15.0;
+					932C545C2FBB02E600BC5378 = {
+						CreatedOnToolsVersion = 26.5;
 					};
 					A15555550000000000000004 = {
 						CreatedOnToolsVersion = 15.0;
-						TestTargetID = A15555550000000000000001;
+						TestTargetID = 932C545C2FBB02E600BC5378;
 					};
 				};
 			};
@@ -261,20 +266,20 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A15555550000000000000001 /* DualCamApp */,
 				A15555550000000000000004 /* DualCamAppTests */,
+				932C545C2FBB02E600BC5378 /* DualCamApp */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A15555550000000000000003 /* Resources */ = {
+		932C545B2FBB02E600BC5378 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A11111110000000000000008 /* Assets.xcassets in Resources */,
-				A1111111000000000000000C /* Localizable.strings in Resources */,
-				A1111111000000000000000D /* InfoPlist.strings in Resources */,
+				A11111110000000000000117 /* Assets.xcassets in Resources */,
+				A11111110000000000000118 /* Localizable.strings in Resources */,
+				A11111110000000000000119 /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -288,26 +293,26 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A15555550000000000000002 /* Sources */ = {
+		932C54592FBB02E600BC5378 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A11111110000000000000001 /* DualCamApp.swift in Sources */,
-				A11111110000000000000002 /* ContentView.swift in Sources */,
-				A1111111000000000000000A /* QuickStartOnboardingView.swift in Sources */,
-				A1111111000000000000000B /* AppLanguage.swift in Sources */,
-				A11111110000000000000003 /* CameraManager.swift in Sources */,
-				A11111110000000000000004 /* VideoRecorder.swift in Sources */,
-				A11111110000000000000005 /* LayoutManager.swift in Sources */,
-				A11111110000000000000006 /* CameraPreviewView.swift in Sources */,
-				A11111110000000000000007 /* LayoutSelectorView.swift in Sources */,
-				A11111110000000000000009 /* LivePhotoRecorder.swift in Sources */,
-				A1111111000000000000000E /* WorksManager.swift in Sources */,
-				A1111111000000000000000F /* WorksView.swift in Sources */,
-				A11111110000000000000010 /* AppSettings.swift in Sources */,
-				A11111110000000000000011 /* SettingsView.swift in Sources */,
-				A11111110000000000000012 /* WorksPresentation.swift in Sources */,
-				A11111110000000000000013 /* CaptureFeedbackService.swift in Sources */,
+				A11111110000000000000101 /* DualCamApp.swift in Sources */,
+				A11111110000000000000102 /* ContentView.swift in Sources */,
+				A11111110000000000000103 /* CameraManager.swift in Sources */,
+				A11111110000000000000104 /* VideoRecorder.swift in Sources */,
+				A11111110000000000000105 /* LayoutManager.swift in Sources */,
+				A11111110000000000000106 /* CameraPreviewView.swift in Sources */,
+				A11111110000000000000107 /* LayoutSelectorView.swift in Sources */,
+				A11111110000000000000108 /* QuickStartOnboardingView.swift in Sources */,
+				A11111110000000000000109 /* AppLanguage.swift in Sources */,
+				A11111110000000000000110 /* LivePhotoRecorder.swift in Sources */,
+				A11111110000000000000111 /* WorksManager.swift in Sources */,
+				A11111110000000000000112 /* WorksView.swift in Sources */,
+				A11111110000000000000113 /* AppSettings.swift in Sources */,
+				A11111110000000000000114 /* SettingsView.swift in Sources */,
+				A11111110000000000000115 /* WorksPresentation.swift in Sources */,
+				A11111110000000000000116 /* CaptureFeedbackService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -322,15 +327,16 @@
 				A11111110000000000000024 /* WorksPresentationTests.swift in Sources */,
 				A11111110000000000000025 /* CaptureFeedbackServiceTests.swift in Sources */,
 				A11111110000000000000026 /* LivePhotoAudioTimingTests.swift in Sources */,
+				A11111110000000000000027 /* CameraDeviceSelectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A15555550000000000000007 /* PBXTargetDependency */ = {
+		A19999990000000000000002 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A15555550000000000000001 /* DualCamApp */;
+			target = 932C545C2FBB02E600BC5378 /* DualCamApp */;
 			targetProxy = A19999990000000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -357,6 +363,82 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		932C54662FBB02E800BC5378 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = P3724G3229;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DualCamApp/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dualcam.ai;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		932C54672FBB02E800BC5378 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = P3724G3229;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DualCamApp/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dualcam.ai;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		A18888880000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -476,68 +558,6 @@
 			};
 			name = Release;
 		};
-		A18888880000000000000003 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = P3724G3229;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = DualCamApp/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "双摄录像";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.dualcam.ai;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		A18888880000000000000004 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = P3724G3229;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = DualCamApp/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "双摄录像";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.dualcam.ai;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 		A18888880000000000000005 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -546,7 +566,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = P3724G3229;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -570,7 +590,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = P3724G3229;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -589,20 +609,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		932C54652FBB02E800BC5378 /* Build configuration list for PBXNativeTarget "DualCamApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				932C54662FBB02E800BC5378 /* Debug */,
+				932C54672FBB02E800BC5378 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A16666660000000000000001 /* Build configuration list for PBXProject "DualCamApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A18888880000000000000001 /* Debug */,
 				A18888880000000000000002 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		A16666660000000000000003 /* Build configuration list for PBXNativeTarget "DualCamApp" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A18888880000000000000003 /* Debug */,
-				A18888880000000000000004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
