@@ -306,7 +306,7 @@ struct ContentView: View {
                 shootingFrameRate: $shootingFrameRate
             )
         }
-        .sheet(isPresented: $showWorks) {
+        .fullScreenCover(isPresented: $showWorks) {
             WorksView(manager: worksManager)
         }
     }

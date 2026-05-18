@@ -10,6 +10,7 @@ struct WorksView: View {
     @State private var isSelecting = false
     @State private var selectedIDs: Set<WorkItem.ID> = []
     @State private var isDeleteConfirmationPresented = false
+    @State private var browsingItemID: WorkItem.ID?
 
     private let columns = [
         GridItem(.flexible(), spacing: 10),
@@ -25,46 +26,59 @@ struct WorksView: View {
     }
 
     private var canShowSelectionControls: Bool {
-        manager.readError == nil && !manager.items.isEmpty
+        manager.readError == nil && !manager.items.isEmpty && browsingItemID == nil
     }
 
     var body: some View {
-        NavigationView {
-            ZStack(alignment: .bottom) {
-                WorksDesign.background.ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            WorksDesign.background.ignoresSafeArea()
 
-                VStack(alignment: .leading, spacing: 18) {
-                    header
-                    filterRow
-                    content
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, isSelecting ? 92 : 18)
-
-                if isSelecting {
-                    selectionActionBar
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .navigationBarHidden(true)
-            .onAppear { manager.reload() }
-            .alert("works.message.title", isPresented: statusMessageBinding) {
-                Button("works.action.ok", role: .cancel) {}
-            } message: {
-                Text(manager.statusMessage ?? "")
-            }
-            .alert("works.delete.confirm.title", isPresented: $isDeleteConfirmationPresented) {
-                Button("works.selection.cancel", role: .cancel) {}
-                Button("works.delete.action", role: .destructive) {
-                    performDeleteSelection()
-                }
-            } message: {
-                Text(L10n.string("works.delete.confirm.message", selectedCount))
+            if let browsingItemID {
+                WorkBrowserView(
+                    items: filteredItems,
+                    initialItemID: browsingItemID,
+                    manager: manager,
+                    onClose: { self.browsingItemID = nil }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            } else {
+                libraryView
+                    .transition(.opacity)
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
+        .onAppear { manager.reload() }
+        .alert("works.message.title", isPresented: statusMessageBinding) {
+            Button("works.action.ok", role: .cancel) {}
+        } message: {
+            Text(manager.statusMessage ?? "")
+        }
+        .alert("works.delete.confirm.title", isPresented: $isDeleteConfirmationPresented) {
+            Button("works.selection.cancel", role: .cancel) {}
+            Button("works.delete.action", role: .destructive) {
+                performDeleteSelection()
+            }
+        } message: {
+            Text(L10n.string("works.delete.confirm.message", selectedCount))
+        }
+    }
+
+    private var libraryView: some View {
+        ZStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 18) {
+                header
+                filterRow
+                content
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, isSelecting ? 92 : 18)
+
+            if isSelecting {
+                selectionActionBar
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
     }
 
     private var header: some View {
@@ -181,7 +195,11 @@ struct WorksView: View {
                             }
                             .buttonStyle(.plain)
                         } else {
-                            NavigationLink(destination: WorkDetailView(item: item, manager: manager)) {
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    browsingItemID = item.id
+                                }
+                            }) {
                                 WorkCard(item: item)
                             }
                             .buttonStyle(.plain)
@@ -418,12 +436,106 @@ private struct WorkCard: View {
     }
 }
 
-private struct WorkDetailView: View {
+private struct WorkBrowserView: View {
+    let items: [WorkItem]
+    let initialItemID: WorkItem.ID
+    @ObservedObject var manager: WorksManager
+    let onClose: () -> Void
+    @State private var currentItemID: WorkItem.ID
+
+    init(items: [WorkItem], initialItemID: WorkItem.ID, manager: WorksManager, onClose: @escaping () -> Void) {
+        self.items = items
+        self.initialItemID = initialItemID
+        self.manager = manager
+        self.onClose = onClose
+        _currentItemID = State(initialValue: initialItemID)
+    }
+
+    private var currentIndex: Int? {
+        items.firstIndex { $0.id == currentItemID }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            browserHeader
+
+            if items.isEmpty {
+                WorksStateView(
+                    icon: "photo.on.rectangle.angled",
+                    titleKey: "works.empty.title",
+                    messageKey: "works.empty.message",
+                    actionTitleKey: "workDetail.back.works",
+                    action: onClose
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                TabView(selection: $currentItemID) {
+                    ForEach(items) { item in
+                        WorkDetailPage(
+                            item: item,
+                            manager: manager,
+                            isActive: currentItemID == item.id
+                        )
+                        .tag(item.id)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+            }
+        }
+        .background(WorksDesign.background.ignoresSafeArea())
+        .onAppear(perform: repairCurrentItemIfNeeded)
+        .onChange(of: items) { _ in repairCurrentItemIfNeeded() }
+    }
+
+    private var browserHeader: some View {
+        HStack {
+            Button(action: onClose) {
+                HStack(spacing: 7) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .black))
+                    Text("workDetail.back.works")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(WorksDesign.accent)
+            }
+
+            Spacer()
+
+            Text("workDetail.title")
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Text(pageCountText)
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundColor(WorksDesign.accent)
+                .frame(minWidth: 52, alignment: .trailing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+        .padding(.bottom, 12)
+        .background(WorksDesign.background.opacity(0.96))
+    }
+
+    private var pageCountText: String {
+        guard let currentIndex else { return "0 / 0" }
+        return "\(currentIndex + 1) / \(items.count)"
+    }
+
+    private func repairCurrentItemIfNeeded() {
+        guard !items.isEmpty else { return }
+        if !items.contains(where: { $0.id == currentItemID }) {
+            currentItemID = items[0].id
+        }
+    }
+}
+
+private struct WorkDetailPage: View {
     let item: WorkItem
     @ObservedObject var manager: WorksManager
-    @Environment(\.dismiss) private var dismiss
+    let isActive: Bool
     @State private var isSharing = false
-    @State private var isPlayingVideo = false
     @State private var isSavingToPhotos = false
     @State private var detailMessage: String?
 
@@ -442,6 +554,7 @@ private struct WorkDetailView: View {
                         Text(item.title)
                             .font(.system(size: 26, weight: .black, design: .rounded))
                             .foregroundColor(.white)
+                            .lineLimit(2)
 
                         Text(metadataText)
                             .font(.system(size: 12, weight: .bold))
@@ -459,36 +572,8 @@ private struct WorkDetailView: View {
                 }
             }
         }
-        .navigationTitle(Text("workDetail.title"))
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { dismiss() }) {
-                    HStack(spacing: 7) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .black))
-                        Text("workDetail.back.works")
-                            .font(.system(size: 14, weight: .bold))
-                    }
-                    .foregroundColor(WorksDesign.accent)
-                }
-            }
-
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { detailMessage = L10n.string("workDetail.more.placeholder") }) {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 17, weight: .black))
-                        .foregroundColor(WorksDesign.accent)
-                }
-            }
-        }
         .sheet(isPresented: $isSharing) {
             ActivityView(activityItems: [item.assetURL])
-        }
-        .sheet(isPresented: $isPlayingVideo) {
-            VideoPlayer(player: AVPlayer(url: item.assetURL))
-                .ignoresSafeArea()
         }
         .alert("works.message.title", isPresented: detailMessageBinding) {
             Button("works.action.ok", role: .cancel) {}
@@ -507,33 +592,13 @@ private struct WorkDetailView: View {
     }
 
     private var preview: some View {
-        Button(action: {
-            if item.kind == .video { isPlayingVideo = true }
-        }) {
-            ZStack {
-                WorkThumbnail(url: item.thumbnailURL ?? item.assetURL)
-                    .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-
-                if item.kind == .video {
-                    Circle()
-                        .fill(Color.black.opacity(0.42))
-                        .frame(width: 68, height: 68)
-                        .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .overlay(
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 22, weight: .black))
-                                .foregroundColor(WorksDesign.accent)
-                        )
-                }
-            }
+        WorkPreview(item: item, isActive: isActive)
+            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 32, style: .continuous)
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 12)
+            .padding(.horizontal, 12)
     }
 
     private func detailPreviewHeight(for size: CGSize) -> CGFloat {
@@ -630,6 +695,91 @@ private struct WorkDetailView: View {
                     continuation.resume(throwing: NSError(domain: "DualCamApp", code: -1))
                 }
             }
+        }
+    }
+}
+
+private struct WorkPreview: View {
+    let item: WorkItem
+    let isActive: Bool
+
+    var body: some View {
+        if item.kind == .video {
+            InlineVideoPreview(item: item, isActive: isActive)
+        } else {
+            WorkThumbnail(url: item.thumbnailURL ?? item.assetURL)
+        }
+    }
+}
+
+@MainActor
+private final class InlineVideoPlayerModel: ObservableObject {
+    let player: AVPlayer
+    @Published private(set) var isPlaying = false
+
+    init(url: URL) {
+        player = AVPlayer(url: url)
+    }
+
+    func togglePlayback() {
+        if isPlaying {
+            pause()
+        } else {
+            player.play()
+            isPlaying = true
+        }
+    }
+
+    func pause() {
+        player.pause()
+        isPlaying = false
+    }
+
+    deinit {
+        player.pause()
+    }
+}
+
+private struct InlineVideoPreview: View {
+    let item: WorkItem
+    let isActive: Bool
+    @StateObject private var playerModel: InlineVideoPlayerModel
+
+    init(item: WorkItem, isActive: Bool) {
+        self.item = item
+        self.isActive = isActive
+        _playerModel = StateObject(wrappedValue: InlineVideoPlayerModel(url: item.assetURL))
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if FileManager.default.fileExists(atPath: item.assetURL.path) {
+                VideoPlayer(player: playerModel.player)
+                    .background(Color.black)
+            } else {
+                WorkThumbnail(url: item.thumbnailURL)
+            }
+
+            Button(action: playerModel.togglePlayback) {
+                Image(systemName: playerModel.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundColor(.black)
+                    .frame(width: 48, height: 48)
+                    .background(Circle().fill(WorksDesign.accent))
+                    .overlay(Circle().stroke(Color.black.opacity(0.18), lineWidth: 1))
+                    .shadow(color: Color.black.opacity(0.24), radius: 12, x: 0, y: 6)
+            }
+            .padding(18)
+            .disabled(!FileManager.default.fileExists(atPath: item.assetURL.path))
+            .opacity(FileManager.default.fileExists(atPath: item.assetURL.path) ? 1 : 0.45)
+        }
+        .onChange(of: isActive) { active in
+            if !active {
+                playerModel.pause()
+            }
+        }
+        .onDisappear {
+            playerModel.pause()
         }
     }
 }

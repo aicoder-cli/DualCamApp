@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-05-18 - Works browsing interaction
+
+### Changed
+
+- Changed the Works library to open as a full-screen album experience instead of a floating sheet.
+- Replaced pushed work detail navigation with an in-page swipe browser for moving between works in the active filter.
+- Changed video work details to play inline on the current page instead of opening a separate playback sheet.
+
 ## 2026-05-18 - Rear focal length control
 
 ### Added
