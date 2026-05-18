@@ -82,6 +82,13 @@
 "livePhoto.badge" = "LIVE";
 "livePhoto.title" = "Live Photo";
 
+"focal.rear.title" = "Rear focal length";
+"focal.autoLens" = "Auto lens";
+"focal.lens.ultraWide" = "Ultra Wide";
+"focal.lens.wide" = "Wide";
+"focal.lens.telephoto" = "Telephoto";
+"focal.lens.digitalCrop" = "Digital crop";
+
 "onboarding.card.dualCamera.title" = "Start Dual Camera Quickly";
 "onboarding.card.dualCamera.body" = "After entering the main screen, allow camera and microphone access to preview front and back cameras at the same time.";
 "onboarding.card.layouts.title" = "Choose a Layout";

@@ -25,6 +25,162 @@ struct CameraConfiguration {
     var connection: AVCaptureConnection?
 }
 
+enum RearLensKind: String, CaseIterable {
+    case ultra
+    case wide
+    case tele
+
+    var titleKey: String {
+        switch self {
+        case .ultra: return "focal.lens.ultraWide"
+        case .wide: return "focal.lens.wide"
+        case .tele: return "focal.lens.telephoto"
+        }
+    }
+}
+
+enum RearLensStatus: Equatable {
+    case physical(RearLensKind)
+    case digitalCrop
+
+    var titleKey: String {
+        switch self {
+        case .physical(let kind): return kind.titleKey
+        case .digitalCrop: return "focal.lens.digitalCrop"
+        }
+    }
+}
+
+struct RearFocalCapability: Equatable {
+    static let prototypeZoomFactors: [CGFloat] = [0.5, 1, 2, 3, 5]
+    static let fallback = RearFocalCapability(
+        minZoomFactor: 1,
+        maxZoomFactor: 1,
+        recommendedZoomFactors: [1],
+        physicalLensByZoom: [1: .wide]
+    )
+
+    let minZoomFactor: CGFloat
+    let maxZoomFactor: CGFloat
+    let recommendedZoomFactors: [CGFloat]
+    let physicalLensByZoom: [CGFloat: RearLensKind]
+
+    init(minZoomFactor: CGFloat, maxZoomFactor: CGFloat, availableLensKinds: Set<RearLensKind>) {
+        let lowerBound = max(0.5, minZoomFactor)
+        let upperBound = max(lowerBound, maxZoomFactor)
+        let supportedZooms = Self.prototypeZoomFactors.filter { zoom in
+            lowerBound - 0.001 <= zoom && zoom <= upperBound + 0.001
+        }
+        let fallbackZoom = min(max(Self.nearestPrototypeZoom(to: min(max(1, lowerBound), upperBound)), lowerBound), upperBound)
+        let recommendedZooms = supportedZooms.isEmpty ? [fallbackZoom] : supportedZooms
+        var lensMap: [CGFloat: RearLensKind] = [:]
+
+        for zoom in recommendedZooms {
+            if zoom < 1, availableLensKinds.contains(.ultra) {
+                lensMap[zoom] = .ultra
+            } else if zoom >= 3, availableLensKinds.contains(.tele) {
+                lensMap[zoom] = .tele
+            } else if zoom == 2, upperBound < 3, availableLensKinds.contains(.tele) {
+                lensMap[zoom] = .tele
+            } else if availableLensKinds.contains(.wide) {
+                lensMap[zoom] = .wide
+            } else if let firstLens = availableLensKinds.sorted(by: { $0.rawValue < $1.rawValue }).first {
+                lensMap[zoom] = firstLens
+            }
+        }
+
+        self.init(
+            minZoomFactor: lowerBound,
+            maxZoomFactor: upperBound,
+            recommendedZoomFactors: recommendedZooms,
+            physicalLensByZoom: lensMap.isEmpty ? [recommendedZooms[0]: .wide] : lensMap
+        )
+    }
+
+    init(
+        minZoomFactor: CGFloat,
+        maxZoomFactor: CGFloat,
+        physicalLensByZoom: [CGFloat: RearLensKind]
+    ) {
+        let lowerBound = max(0.5, minZoomFactor)
+        let upperBound = max(lowerBound, maxZoomFactor)
+        let recommendedZooms = Self.recommendedZoomFactors(
+            lowerBound: lowerBound,
+            upperBound: upperBound,
+            physicalLensByZoom: physicalLensByZoom
+        )
+
+        self.init(
+            minZoomFactor: lowerBound,
+            maxZoomFactor: upperBound,
+            recommendedZoomFactors: recommendedZooms,
+            physicalLensByZoom: physicalLensByZoom.isEmpty ? [recommendedZooms[0]: .wide] : physicalLensByZoom
+        )
+    }
+
+    init(
+        minZoomFactor: CGFloat,
+        maxZoomFactor: CGFloat,
+        recommendedZoomFactors: [CGFloat],
+        physicalLensByZoom: [CGFloat: RearLensKind]
+    ) {
+        self.minZoomFactor = minZoomFactor
+        self.maxZoomFactor = maxZoomFactor
+        self.recommendedZoomFactors = recommendedZoomFactors
+        self.physicalLensByZoom = physicalLensByZoom
+    }
+
+    func clampedZoomFactor(_ zoomFactor: CGFloat) -> CGFloat {
+        min(max(zoomFactor, minZoomFactor), maxZoomFactor)
+    }
+
+    func lensStatus(for zoomFactor: CGFloat) -> RearLensStatus {
+        let clampedZoom = clampedZoomFactor(zoomFactor)
+        if let exactZoom = physicalLensByZoom.keys.first(where: { abs($0 - clampedZoom) < 0.01 }),
+           let lensKind = physicalLensByZoom[exactZoom] {
+            return .physical(lensKind)
+        }
+        return .digitalCrop
+    }
+
+    static func formattedZoomFactor(_ zoomFactor: CGFloat) -> String {
+        let rounded = zoomFactor.rounded()
+        if abs(zoomFactor - rounded) < 0.01 {
+            return String(format: "%.0f×", rounded)
+        }
+        return String(format: "%.1f×", zoomFactor)
+    }
+
+    private static func recommendedZoomFactors(
+        lowerBound: CGFloat,
+        upperBound: CGFloat,
+        physicalLensByZoom: [CGFloat: RearLensKind]
+    ) -> [CGFloat] {
+        var zooms = physicalLensByZoom.keys
+            .filter { lowerBound - 0.001 <= $0 && $0 <= upperBound + 0.001 }
+            .sorted()
+
+        if !zooms.contains(where: { abs($0 - 1) < 0.01 }), lowerBound <= 1, 1 <= upperBound {
+            zooms.append(1)
+        }
+
+        let highestPhysicalZoom = zooms.max() ?? 1
+        if highestPhysicalZoom >= 5, lowerBound <= 2, 2 <= upperBound, !zooms.contains(where: { abs($0 - 2) < 0.01 }) {
+            zooms.append(2)
+        }
+
+        if zooms.isEmpty {
+            zooms = [min(max(1, lowerBound), upperBound)]
+        }
+
+        return zooms.sorted()
+    }
+
+    private static func nearestPrototypeZoom(to zoomFactor: CGFloat) -> CGFloat {
+        prototypeZoomFactors.min { abs($0 - zoomFactor) < abs($1 - zoomFactor) } ?? 1
+    }
+}
+
 /// 多摄像头管理器
 @MainActor
 class CameraManager: NSObject, ObservableObject {
@@ -39,6 +195,12 @@ class CameraManager: NSObject, ObservableObject {
     @Published var preferredFrameRate: Int32 = 30
     @Published var effectiveFrameRate: Int32 = 30
     @Published var frameRateDebugInfo = L10n.string("debug.fps.waiting")
+    @Published var rearFocalCapability = RearFocalCapability.fallback
+    @Published var rearZoomFactor: CGFloat = 1
+
+    var rearLensStatus: RearLensStatus {
+        rearFocalCapability.lensStatus(for: rearZoomFactor)
+    }
 
     // MARK: - Private Properties
     private let frontSession = AVCaptureSession()
@@ -62,12 +224,22 @@ class CameraManager: NSObject, ObservableObject {
     private var frameRateSelectionReason = L10n.string("debug.camera.waiting")
     private var measuredFrontFrameRate: Double?
     private var measuredBackFrameRate: Double?
+    private var rearFocalDeviceZoomScale: CGFloat = 1
 
     private struct FrameRateSelection {
         let frameRate: Int32
         let formats: [(device: AVCaptureDevice, format: AVCaptureDevice.Format)]
         let reason: String
     }
+
+    private let rearDeviceTypes: [AVCaptureDevice.DeviceType] = [
+        .builtInTripleCamera,
+        .builtInDualWideCamera,
+        .builtInDualCamera,
+        .builtInWideAngleCamera,
+        .builtInTelephotoCamera,
+        .builtInUltraWideCamera
+    ]
 
     // nonisolated 引用：供 delegate 回调中使用，避免跨 Actor 访问
     nonisolated(unsafe) private var _frontVideoOutput: AVCaptureVideoDataOutput?
@@ -95,7 +267,7 @@ class CameraManager: NSObject, ObservableObject {
     private func setupCameras() {
         // 检查多摄像头支持
         let discoverySession = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInWideAngleCamera, .builtInTelephotoCamera, .builtInUltraWideCamera],
+            deviceTypes: [.builtInWideAngleCamera] + rearDeviceTypes.filter { $0 != .builtInWideAngleCamera },
             mediaType: .video,
             position: .unspecified
         )
@@ -333,6 +505,7 @@ class CameraManager: NSObject, ObservableObject {
         }
 
         updateFrameRateDebugInfo()
+        refreshRearFocalCapability()
     }
 
     private func resolveFrameRateSelection(
@@ -478,16 +651,205 @@ class CameraManager: NSObject, ObservableObject {
         )
     }
 
+    private func preferredBackCameraDevices() -> [AVCaptureDevice] {
+        availableBackCameraDevices().sorted { backCameraDeviceRank($0) > backCameraDeviceRank($1) }
+    }
+
+    private func availableBackCameraDevices() -> [AVCaptureDevice] {
+        let defaults = rearDeviceTypes.compactMap { AVCaptureDevice.default($0, for: .video, position: .back) }
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: rearDeviceTypes,
+            mediaType: .video,
+            position: .back
+        )
+        return (defaults + discoverySession.devices).reduce(into: [AVCaptureDevice]()) { devices, device in
+            if !devices.contains(where: { $0.uniqueID == device.uniqueID }) {
+                devices.append(device)
+            }
+        }
+    }
+
+    private func backCameraDeviceRank(_ device: AVCaptureDevice) -> Int {
+        let kinds = lensKinds(for: device)
+        var rank = kinds.count * 100
+        if kinds.contains(.ultra) { rank += 50 }
+        if kinds.contains(.wide) { rank += 30 }
+        if kinds.contains(.tele) { rank += 20 }
+        if device.isVirtualDevice { rank += 10 }
+        return rank
+    }
+
+    private func lensKinds(for device: AVCaptureDevice) -> Set<RearLensKind> {
+        let sourceDevices = device.isVirtualDevice ? device.constituentDevices : [device]
+        var kinds = Set<RearLensKind>()
+
+        for sourceDevice in sourceDevices {
+            switch sourceDevice.deviceType {
+            case .builtInUltraWideCamera:
+                kinds.insert(.ultra)
+            case .builtInTelephotoCamera:
+                kinds.insert(.tele)
+            case .builtInWideAngleCamera, .builtInDualCamera, .builtInDualWideCamera, .builtInTripleCamera:
+                kinds.insert(.wide)
+            default:
+                break
+            }
+        }
+
+        if kinds.isEmpty {
+            kinds.insert(.wide)
+        }
+        return kinds
+    }
+
+    private func refreshRearFocalCapability() {
+        guard let device = backCamera.device else {
+            rearFocalDeviceZoomScale = 1
+            rearFocalCapability = .fallback
+            rearZoomFactor = 1
+            return
+        }
+
+        let lensKinds = lensKinds(for: device)
+        rearFocalDeviceZoomScale = productZoomScale(for: device, lensKinds: lensKinds)
+        let capability = rearFocalCapability(for: device, activeLensKinds: lensKinds)
+        rearFocalCapability = capability
+        rearZoomFactor = capability.clampedZoomFactor(device.videoZoomFactor / rearFocalDeviceZoomScale)
+    }
+
+    private func rearFocalCapability(for activeDevice: AVCaptureDevice, activeLensKinds: Set<RearLensKind>) -> RearFocalCapability {
+        let allBackDevices = availableBackCameraDevices()
+        var productMinZoom = activeDevice.minAvailableVideoZoomFactor / rearFocalDeviceZoomScale
+        var productMaxZoom = activeDevice.maxAvailableVideoZoomFactor / rearFocalDeviceZoomScale
+        var lensMap: [CGFloat: RearLensKind] = [:]
+
+        for device in allBackDevices {
+            let kinds = lensKinds(for: device)
+            let scale = productZoomScale(for: device, lensKinds: kinds)
+            productMinZoom = min(productMinZoom, device.minAvailableVideoZoomFactor / scale)
+            productMaxZoom = max(productMaxZoom, device.maxAvailableVideoZoomFactor / scale)
+            lensMap.merge(physicalLensByProductZoom(for: device, lensKinds: kinds, productZoomScale: scale)) { current, _ in current }
+        }
+        lensMap.merge(fieldOfViewLensByProductZoom(from: allBackDevices)) { current, _ in current }
+
+        if lensMap.isEmpty {
+            let fallbackZoom = min(max(1, productMinZoom), productMaxZoom)
+            lensMap[fallbackZoom] = activeLensKinds.contains(.wide) ? .wide : (activeLensKinds.sorted { $0.rawValue < $1.rawValue }.first ?? .wide)
+        }
+
+        let nativeMaxZoom = min(productMaxZoom, nativeMaximumProductZoom(physicalLensByZoom: lensMap))
+        return RearFocalCapability(
+            minZoomFactor: productMinZoom,
+            maxZoomFactor: nativeMaxZoom,
+            physicalLensByZoom: lensMap
+        )
+    }
+
+    private func physicalLensByProductZoom(
+        for device: AVCaptureDevice,
+        lensKinds: Set<RearLensKind>,
+        productZoomScale: CGFloat
+    ) -> [CGFloat: RearLensKind] {
+        let productMinZoom = device.minAvailableVideoZoomFactor / productZoomScale
+        let productMaxZoom = device.maxAvailableVideoZoomFactor / productZoomScale
+        let switchOverZooms = device.virtualDeviceSwitchOverVideoZoomFactors
+            .map { CGFloat(truncating: $0) / productZoomScale }
+            .sorted()
+        var lensMap: [CGFloat: RearLensKind] = [:]
+
+        if lensKinds.contains(.ultra), productMinZoom < 1 {
+            lensMap[productMinZoom] = .ultra
+        }
+        if lensKinds.contains(.wide), productMinZoom - 0.001 <= 1, 1 <= productMaxZoom + 0.001 {
+            lensMap[1] = .wide
+        }
+        if lensKinds.contains(.tele) {
+            for zoom in switchOverZooms where zoom > 1.01 {
+                lensMap[zoom] = .tele
+            }
+        }
+
+        return lensMap
+    }
+
+    private func fieldOfViewLensByProductZoom(from devices: [AVCaptureDevice]) -> [CGFloat: RearLensKind] {
+        let physicalDevices = devices.flatMap { device in
+            device.isVirtualDevice ? device.constituentDevices : [device]
+        }.reduce(into: [AVCaptureDevice]()) { result, device in
+            if device.position == .back, !result.contains(where: { $0.uniqueID == device.uniqueID }) {
+                result.append(device)
+            }
+        }
+        guard let wideDevice = physicalDevices.first(where: { $0.deviceType == .builtInWideAngleCamera }) else {
+            return [:]
+        }
+
+        let wideFOV = CGFloat(wideDevice.activeFormat.videoFieldOfView) * .pi / 180
+        guard wideFOV > 0 else { return [:] }
+        var lensMap: [CGFloat: RearLensKind] = [1: .wide]
+
+        for device in physicalDevices {
+            let fov = CGFloat(device.activeFormat.videoFieldOfView) * .pi / 180
+            guard fov > 0 else { continue }
+            let productZoom = tan(wideFOV / 2) / tan(fov / 2)
+            let roundedZoom = nativeRoundedZoom(productZoom)
+
+            switch device.deviceType {
+            case .builtInUltraWideCamera where roundedZoom < 1:
+                lensMap[roundedZoom] = .ultra
+            case .builtInTelephotoCamera where roundedZoom > 1:
+                lensMap[roundedZoom] = .tele
+            case .builtInWideAngleCamera:
+                lensMap[1] = .wide
+            default:
+                break
+            }
+        }
+
+        return lensMap
+    }
+
+    private func nativeMaximumProductZoom(physicalLensByZoom: [CGFloat: RearLensKind]) -> CGFloat {
+        let teleZooms = physicalLensByZoom.compactMap { zoom, kind in
+            kind == .tele ? zoom : nil
+        }
+        let highestTeleZoom = teleZooms.max() ?? 1
+
+        if highestTeleZoom >= 4.5 {
+            return 25
+        }
+        if highestTeleZoom >= 2.5 {
+            return 15
+        }
+        if highestTeleZoom >= 1.5 {
+            return 10
+        }
+        return physicalLensByZoom.keys.contains(where: { $0 < 1 }) ? 5 : 3
+    }
+
+    private func nativeRoundedZoom(_ zoomFactor: CGFloat) -> CGFloat {
+        let nativeStops: [CGFloat] = [0.5, 1, 2, 3, 5]
+        if let nearestStop = nativeStops.min(by: { abs($0 - zoomFactor) < abs($1 - zoomFactor) }),
+           abs(nearestStop - zoomFactor) < 0.35 {
+            return nearestStop
+        }
+        return (zoomFactor * 10).rounded() / 10
+    }
+
+    private func productZoomScale(for device: AVCaptureDevice, lensKinds: Set<RearLensKind>) -> CGFloat {
+        guard device.isVirtualDevice, lensKinds.contains(.ultra) else { return 1 }
+        let switchOverZooms = device.virtualDeviceSwitchOverVideoZoomFactors
+            .map { CGFloat(truncating: $0) }
+            .sorted()
+        return switchOverZooms.first ?? 2
+    }
+
     private func setupMultiCamSession() async {
         guard !isMultiCamConfigured else { return }
 
         do {
             guard let frontDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
                 errorMessage = L10n.string("error.camera.frontNotFound")
-                return
-            }
-            guard let backDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-                errorMessage = L10n.string("error.camera.backNotFound")
                 return
             }
 
@@ -503,12 +865,23 @@ class CameraManager: NSObject, ObservableObject {
             frontCamera.device = frontDevice
             frontCamera.input = frontInput
 
-            let backInput = try AVCaptureDeviceInput(device: backDevice)
-            guard multiCamSession.canAddInput(backInput) else {
+            var selectedBackDevice: AVCaptureDevice?
+            var selectedBackInput: AVCaptureDeviceInput?
+            for candidate in preferredBackCameraDevices() {
+                let input = try AVCaptureDeviceInput(device: candidate)
+                if multiCamSession.canAddInput(input) {
+                    selectedBackDevice = candidate
+                    selectedBackInput = input
+                    break
+                }
+            }
+
+            guard let backDevice = selectedBackDevice, let backInput = selectedBackInput else {
                 multiCamSession.commitConfiguration()
                 errorMessage = L10n.string("error.camera.cannotAddBackInput")
                 return
             }
+
             multiCamSession.addInputWithNoConnections(backInput)
             backCamera.device = backDevice
             backCamera.input = backInput
@@ -667,23 +1040,30 @@ class CameraManager: NSObject, ObservableObject {
         guard !isBackCameraConfigured else { return }
 
         do {
-            guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+            backSession.beginConfiguration()
+            backSession.sessionPreset = .hd1280x720
+
+            var selectedDevice: AVCaptureDevice?
+            var selectedInput: AVCaptureDeviceInput?
+            for candidate in preferredBackCameraDevices() {
+                let input = try AVCaptureDeviceInput(device: candidate)
+                if backSession.canAddInput(input) {
+                    selectedDevice = candidate
+                    selectedInput = input
+                    break
+                }
+            }
+
+            guard let device = selectedDevice, let input = selectedInput else {
+                backSession.commitConfiguration()
                 errorMessage = L10n.string("error.camera.backNotFound")
                 return
             }
 
-            backSession.beginConfiguration()
-            backSession.sessionPreset = .hd1280x720
-
             backCamera.device = device
             applyPreferredFrameRateIfPossible()
-
-            let input = try AVCaptureDeviceInput(device: device)
             backCamera.input = input
-
-            if backSession.canAddInput(input) {
-                backSession.addInput(input)
-            }
+            backSession.addInput(input)
 
             let videoOutput = AVCaptureVideoDataOutput()
             videoOutput.setSampleBufferDelegate(self, queue: backVideoDataOutputQueue)
@@ -772,18 +1152,26 @@ class CameraManager: NSObject, ObservableObject {
     
     /// 设置缩放倍数（仅后置摄像头支持）
     func setZoomFactor(_ factor: CGFloat) {
+        setRearZoomFactor(factor)
+    }
+
+    func setRearZoomFactor(_ factor: CGFloat) {
         guard let device = backCamera.device else { return }
-        
+        let productZoomFactor = rearFocalCapability.clampedZoomFactor(factor)
+        let rawZoomFactor = min(
+            max(productZoomFactor * rearFocalDeviceZoomScale, device.minAvailableVideoZoomFactor),
+            min(device.maxAvailableVideoZoomFactor, rearFocalCapability.maxZoomFactor * rearFocalDeviceZoomScale)
+        )
+
         do {
             try device.lockForConfiguration()
-            let maxZoom = device.activeFormat.videoMaxZoomFactor
-            let zoomFactor = min(max(factor, 1.0), maxZoom)
-            device.videoZoomFactor = zoomFactor
+            device.videoZoomFactor = rawZoomFactor
             device.unlockForConfiguration()
+            rearZoomFactor = rearFocalCapability.clampedZoomFactor(rawZoomFactor / rearFocalDeviceZoomScale)
         } catch {
         }
     }
-    
+
     /// 设置对焦点
     func setFocusPoint(_ point: CGPoint, for cameraType: CameraType) {
         let camera = cameraType == .front ? frontCamera : backCamera

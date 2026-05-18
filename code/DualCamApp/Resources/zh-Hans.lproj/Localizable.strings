@@ -82,6 +82,13 @@
 "livePhoto.badge" = "LIVE";
 "livePhoto.title" = "Live Photo";
 
+"focal.rear.title" = "后摄焦段";
+"focal.autoLens" = "自动镜头";
+"focal.lens.ultraWide" = "超广角";
+"focal.lens.wide" = "广角";
+"focal.lens.telephoto" = "长焦";
+"focal.lens.digitalCrop" = "数码裁切";
+
 "onboarding.card.dualCamera.title" = "一键开启双摄";
 "onboarding.card.dualCamera.body" = "进入主界面后允许摄像头和麦克风权限，即可同时预览前后画面。";
 "onboarding.card.layouts.title" = "选择画面布局";

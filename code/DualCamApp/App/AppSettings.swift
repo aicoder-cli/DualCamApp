@@ -16,6 +16,7 @@ enum SettingsKey {
     static let controlRevealSeconds = "controlRevealSeconds"
     static let recordingCountdownSeconds = "recordingCountdownSeconds"
     static let soundAndHapticsEnabled = "soundAndHapticsEnabled"
+    static let lastRearFocalLength = "lastRearFocalLength"
     static let saveToSystemPhotos = "saveToSystemPhotos"
     static let keepOriginalStreams = "keepOriginalStreams"
     static let workNamingRule = "workNamingRule"
@@ -49,6 +50,7 @@ enum AppSettings {
             SettingsKey.controlRevealSeconds: ControlRevealDuration.twoSeconds.rawValue,
             SettingsKey.recordingCountdownSeconds: RecordingCountdown.off.rawValue,
             SettingsKey.soundAndHapticsEnabled: true,
+            SettingsKey.lastRearFocalLength: 1.0,
             SettingsKey.saveToSystemPhotos: false,
             SettingsKey.keepOriginalStreams: false,
             SettingsKey.workNamingRule: WorkNamingRule.dateLayout.rawValue,

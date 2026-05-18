@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-05-18 - Rear focal length control
+
+### Added
+
+- Added a preview-level rear focal length entry that expands into prototype-matched zoom chips and a continuous slider.
+- Added device-derived rear focal capability filtering so unavailable zoom chips are hidden on devices with fewer rear lenses.
+- Added physical rear-lens switch-over based chip selection, such as 0.5× / 1× / 3× on 3× tele devices while preserving the full supported slider range.
+- Added localized lens status copy for Ultra Wide, Wide, Telephoto, and Digital crop states.
+
+### Changed
+
+- Persisted the last selected rear focal length and clamp it to the current device's supported range when the camera starts.
+- Moved the rear focal length entry to the upper-right preview area to avoid overlapping the layout selector.
+- Switched rear camera selection to prefer multi-lens virtual rear devices when available, so focal changes can happen through zoom without rebuilding the capture session.
+
 ## 2026-05-17 - Sound and haptics feedback
 
 ### Added

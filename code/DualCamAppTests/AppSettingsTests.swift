@@ -36,6 +36,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.controlRevealSeconds), ControlRevealDuration.twoSeconds.rawValue)
         XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.recordingCountdownSeconds), RecordingCountdown.off.rawValue)
         XCTAssertTrue(userDefaults.bool(forKey: SettingsKey.soundAndHapticsEnabled))
+        XCTAssertEqual(userDefaults.double(forKey: SettingsKey.lastRearFocalLength), 1.0)
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.saveToSystemPhotos))
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.keepOriginalStreams))
         XCTAssertEqual(userDefaults.string(forKey: SettingsKey.workNamingRule), WorkNamingRule.dateLayout.rawValue)
@@ -74,5 +75,57 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(LivePhotoDurationOption.from(seconds: 5.0), .extended)
         XCTAssertEqual(LivePhotoDurationOption.from(seconds: -100), .short)
         XCTAssertEqual(LivePhotoDurationOption.from(seconds: 4.4), .extended)
+    }
+
+    func testRearFocalCapabilityFiltersPrototypeZoomsToSupportedRange() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 1,
+            maxZoomFactor: 2.5,
+            availableLensKinds: [.wide]
+        )
+
+        XCTAssertEqual(capability.recommendedZoomFactors, [1, 2])
+        XCTAssertEqual(capability.clampedZoomFactor(0.5), 1)
+        XCTAssertEqual(capability.clampedZoomFactor(5), 2.5)
+    }
+
+    func testRearFocalCapabilityMapsPhysicalLensStatusAndDigitalCrop() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 0.5,
+            maxZoomFactor: 5,
+            physicalLensByZoom: [0.5: .ultra, 1: .wide, 3: .tele]
+        )
+
+        XCTAssertEqual(capability.lensStatus(for: 0.5), .physical(.ultra))
+        XCTAssertEqual(capability.lensStatus(for: 1), .physical(.wide))
+        XCTAssertEqual(capability.lensStatus(for: 3), .physical(.tele))
+        XCTAssertEqual(capability.lensStatus(for: 1.4), .digitalCrop)
+    }
+
+    func testRearFocalCapabilityUsesPhysicalLensZoomsForThirteenProStyleRange() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 0.5,
+            maxZoomFactor: 15,
+            physicalLensByZoom: [0.5: .ultra, 1: .wide, 3: .tele]
+        )
+
+        XCTAssertEqual(capability.recommendedZoomFactors, [0.5, 1, 3])
+        XCTAssertEqual(capability.maxZoomFactor, 15)
+    }
+
+    func testRearFocalCapabilityAddsTwoTimesCropForFiveTimesTeleRange() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 0.5,
+            maxZoomFactor: 25,
+            physicalLensByZoom: [0.5: .ultra, 1: .wide, 5: .tele]
+        )
+
+        XCTAssertEqual(capability.recommendedZoomFactors, [0.5, 1, 2, 5])
+    }
+
+    func testRearFocalCapabilityFormatsZoomFactors() {
+        XCTAssertEqual(RearFocalCapability.formattedZoomFactor(0.5), "0.5×")
+        XCTAssertEqual(RearFocalCapability.formattedZoomFactor(1), "1×")
+        XCTAssertEqual(RearFocalCapability.formattedZoomFactor(2.3), "2.3×")
     }
 }

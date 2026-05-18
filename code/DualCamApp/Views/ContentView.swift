@@ -72,7 +72,9 @@ struct ContentView: View {
     @State private var hasAppliedInitialPreferences = false
     @State private var recordingControlsRevealed = false
     @State private var hasShownStartupMinimumDuration = false
+    @State private var isRearFocalPickerPresented = false
     @State private var hideControlsWorkItem: DispatchWorkItem?
+    @State private var hideRearFocalPickerWorkItem: DispatchWorkItem?
     @AppStorage(SettingsKey.defaultLivePhotoDuration) private var defaultLivePhotoDuration: Double = 2.5
     @AppStorage(SettingsKey.shootingFrameRate) private var shootingFrameRate: Int = 30
     @AppStorage(SettingsKey.defaultCaptureMode) private var defaultCaptureModeRaw = DefaultCaptureMode.video.rawValue
@@ -82,6 +84,7 @@ struct ContentView: View {
     @AppStorage(SettingsKey.immersiveRecording) private var immersiveRecording = true
     @AppStorage(SettingsKey.controlRevealSeconds) private var controlRevealSeconds = ControlRevealDuration.twoSeconds.rawValue
     @AppStorage(SettingsKey.soundAndHapticsEnabled) private var soundAndHapticsEnabled = true
+    @AppStorage(SettingsKey.lastRearFocalLength) private var lastRearFocalLength: Double = 1.0
 
     private var isVideoRecording: Bool {
         captureMode == .video && videoRecorder.recordingState == .recording
@@ -178,6 +181,23 @@ struct ContentView: View {
                     .padding(.bottom, 22)
                 }
 
+                if cameraManager.backCameraReady && !shouldShowStartupLoading && !showCustomizePanel {
+                    RearFocalLengthControl(
+                        capability: cameraManager.rearFocalCapability,
+                        zoomFactor: cameraManager.rearZoomFactor,
+                        lensStatus: cameraManager.rearLensStatus,
+                        isExpanded: $isRearFocalPickerPresented,
+                        onOpen: presentRearFocalPicker,
+                        onZoomChange: setRearFocalLength
+                    )
+                    .frame(width: isRearFocalPickerPresented ? min(geometry.size.width - 36, 340) : 48, alignment: .trailing)
+                    .padding(.top, 154)
+                    .padding(.trailing, 18)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(2)
+                }
+
                 if let error = cameraManager.errorMessage ?? videoRecorder.errorMessage {
                     ErrorBanner(message: error) {
                         withAnimation { cameraManager.errorMessage = nil; videoRecorder.errorMessage = nil }
@@ -210,6 +230,8 @@ struct ContentView: View {
             Task<Void, Never> {
                 await cameraManager.setPreferredFrameRate(Int32(frameRate))
                 await cameraManager.startCapture()
+                await cameraManager.setRearZoomFactor(1.0)
+                lastRearFocalLength = 1.0
             }
             Task<Void, Never> {
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
@@ -219,6 +241,9 @@ struct ContentView: View {
         .onChange(of: shootingFrameRate) { frameRate in
             guard videoRecorder.recordingState == .idle else { return }
             Task<Void, Never> { await cameraManager.setPreferredFrameRate(Int32(frameRate)) }
+        }
+        .onChange(of: cameraManager.rearZoomFactor) { zoomFactor in
+            lastRearFocalLength = Double(zoomFactor)
         }
         .onChange(of: videoRecorder.recordingState) { state in
             if state == .recording {
@@ -266,6 +291,8 @@ struct ContentView: View {
         .onChange(of: layoutManager.containerSize) { _ in updateRecordingLayoutSnapshot() }
         .onDisappear {
             resetRecordingControls()
+            hideRearFocalPickerWorkItem?.cancel()
+            hideRearFocalPickerWorkItem = nil
             videoRecorder.setLivePhotoPrebufferingEnabled(false, duration: defaultLivePhotoDuration)
             clearRecordingHandlers()
             cameraManager.stopCapture()
@@ -371,6 +398,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .topTrailing)))
             }
+
         }
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded { revealRecordingControls() })
@@ -409,6 +437,33 @@ struct ContentView: View {
         withAnimation(.easeInOut(duration: 0.18)) {
             recordingControlsRevealed = false
         }
+    }
+
+    private func presentRearFocalPicker() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
+            isRearFocalPickerPresented = true
+        }
+        scheduleRearFocalPickerHide()
+    }
+
+    private func setRearFocalLength(_ zoomFactor: CGFloat) {
+        cameraManager.setRearZoomFactor(zoomFactor)
+        lastRearFocalLength = Double(cameraManager.rearZoomFactor)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
+            isRearFocalPickerPresented = true
+        }
+        scheduleRearFocalPickerHide()
+    }
+
+    private func scheduleRearFocalPickerHide() {
+        hideRearFocalPickerWorkItem?.cancel()
+        let workItem = DispatchWorkItem {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isRearFocalPickerPresented = false
+            }
+        }
+        hideRearFocalPickerWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2, execute: workItem)
     }
 
     private func updateLivePhotoPrebuffering() {
@@ -482,6 +537,119 @@ struct ContentView: View {
         cameraManager.frontVideoFrameHandler = nil
         cameraManager.backVideoFrameHandler = nil
         cameraManager.audioSampleBufferHandler = nil
+    }
+}
+
+private struct RearFocalLengthControl: View {
+    let capability: RearFocalCapability
+    let zoomFactor: CGFloat
+    let lensStatus: RearLensStatus
+    @Binding var isExpanded: Bool
+    let onOpen: () -> Void
+    let onZoomChange: (CGFloat) -> Void
+
+    private var zoomText: String {
+        RearFocalCapability.formattedZoomFactor(zoomFactor)
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if isExpanded {
+                expandedPanel
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                triggerButton
+                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+            }
+        }
+    }
+
+    private var triggerButton: some View {
+        HStack(spacing: 0) {
+            Text(zoomText)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundColor(.white)
+                .monospacedDigit()
+        }
+        .frame(width: 48, height: 36)
+        .background(Capsule().fill(Color.black.opacity(0.50)))
+        .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1))
+        .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 8)
+        .onTapGesture { onOpen() }
+        .accessibilityLabel(Text("focal.rear.title"))
+        .accessibilityValue(Text(zoomText))
+    }
+
+    private var expandedPanel: some View {
+        VStack(spacing: 12) {
+            Text(zoomText)
+                .font(.system(size: 26, weight: .black, design: .rounded))
+                .foregroundColor(.white)
+                .monospacedDigit()
+                .padding(.horizontal, 18)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(Color.black.opacity(0.42)))
+                .overlay(Capsule().stroke(Color.white.opacity(0.14), lineWidth: 1))
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("focal.rear.title")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text("\(L10n.string("focal.autoLens")): \(L10n.string(lensStatus.titleKey))")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.58))
+                }
+
+                HStack(spacing: 8) {
+                    ForEach(capability.recommendedZoomFactors, id: \.self) { zoom in
+                        Button(action: { onZoomChange(zoom) }) {
+                            Text(RearFocalCapability.formattedZoomFactor(zoom))
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundColor(abs(zoom - zoomFactor) < 0.01 ? .black : .white.opacity(0.76))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(
+                                    Capsule()
+                                        .fill(abs(zoom - zoomFactor) < 0.01 ? Design.accent : Color.white.opacity(0.09))
+                                )
+                                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
+                        }
+                    }
+                }
+
+                if capability.maxZoomFactor > capability.minZoomFactor {
+                    HStack(spacing: 10) {
+                        Text(RearFocalCapability.formattedZoomFactor(capability.minZoomFactor))
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.48))
+                        Slider(
+                            value: Binding(
+                                get: { Double(zoomFactor) },
+                                set: { onZoomChange(CGFloat($0)) }
+                            ),
+                            in: Double(capability.minZoomFactor)...Double(capability.maxZoomFactor)
+                        )
+                        .accentColor(Design.accent)
+                        Text(RearFocalCapability.formattedZoomFactor(capability.maxZoomFactor))
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.48))
+                    }
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.32), radius: 22, x: 0, y: 12)
+        }
     }
 }
 
