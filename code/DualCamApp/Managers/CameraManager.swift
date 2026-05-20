@@ -61,7 +61,7 @@ enum CameraDeviceSelection {
     }
 }
 
-enum RearLensKind: String, CaseIterable {
+nonisolated enum RearLensKind: String, CaseIterable {
     case ultra
     case wide
     case tele
@@ -125,7 +125,7 @@ enum NativeOutputError: LocalizedError {
     }
 }
 
-enum RearLensStatus: Equatable {
+nonisolated enum RearLensStatus: Equatable {
     case physical(RearLensKind)
     case digitalCrop
 
@@ -137,7 +137,7 @@ enum RearLensStatus: Equatable {
     }
 }
 
-struct RearFocalCapability: Equatable {
+nonisolated struct RearFocalCapability: Equatable {
     static let prototypeZoomFactors: [CGFloat] = [0.5, 1, 2, 3, 5]
     static let fallback = RearFocalCapability(
         minZoomFactor: 1,
@@ -397,6 +397,8 @@ class CameraManager: NSObject, ObservableObject {
     @Published var isSessionRunning = false
     @Published var frontCameraReady = false
     @Published var backCameraReady = false
+    @Published var hasDeliveredFrontVideoFrame = false
+    @Published var hasDeliveredBackVideoFrame = false
     @Published var errorMessage: String?
     @Published var didFinishStartupAttempt = false
     @Published var hasMultiCameraSupport = false
@@ -409,6 +411,15 @@ class CameraManager: NSObject, ObservableObject {
 
     var rearLensStatus: RearLensStatus {
         rearFocalCapability.lensStatus(for: rearZoomFactor)
+    }
+
+    var hasDeliveredRequiredVideoFrames: Bool {
+        guard isSessionRunning, hasDeliveredFrontVideoFrame else { return false }
+        return !shouldWaitForBackVideoFrame || hasDeliveredBackVideoFrame
+    }
+
+    private var shouldWaitForBackVideoFrame: Bool {
+        backCameraReady && _backVideoOutput != nil && (multiCamSession.isRunning || backSession.isRunning)
     }
 
     // MARK: - Private Properties
@@ -509,6 +520,7 @@ class CameraManager: NSObject, ObservableObject {
         hasMultiCameraSupport = false
         frontCameraReady = false
         backCameraReady = false
+        resetFirstFrameReadiness()
         isFrontCameraConfigured = false
         isBackCameraConfigured = false
         _frontVideoOutput = nil
@@ -591,6 +603,7 @@ class CameraManager: NSObject, ObservableObject {
     func startCapture() async {
         didFinishStartupAttempt = false
         errorMessage = nil
+        resetFirstFrameReadiness()
         defer { didFinishStartupAttempt = true }
 
         guard await requestPermissions() else { return }
@@ -673,6 +686,21 @@ class CameraManager: NSObject, ObservableObject {
         iPadRearFallbackTriggered = false
     }
 
+    private func resetFirstFrameReadiness() {
+        hasDeliveredFrontVideoFrame = false
+        hasDeliveredBackVideoFrame = false
+    }
+
+    private func markFirstVideoFrame(isFront: Bool) {
+        if isFront {
+            guard !hasDeliveredFrontVideoFrame else { return }
+            hasDeliveredFrontVideoFrame = true
+        } else {
+            guard !hasDeliveredBackVideoFrame else { return }
+            hasDeliveredBackVideoFrame = true
+        }
+    }
+
     private func startDelayedIPadRearCaptureIfNeeded() async {
         guard UIDevice.current.userInterfaceIdiom == .pad,
               isIPadDelayedRearStartupActive,
@@ -696,6 +724,7 @@ class CameraManager: NSObject, ObservableObject {
 
         let rearStartTime = Date.timeIntervalSinceReferenceDate
         backCameraReady = false
+        hasDeliveredBackVideoFrame = false
         refreshVideoOrientations()
         isSessionRunning = frontCameraReady && frontSession.isRunning
         scheduleIPadRearStartupValidation(rearStartTime: rearStartTime, hasShownRearPreview: false)
@@ -750,6 +779,7 @@ class CameraManager: NSObject, ObservableObject {
     func stopCapture() {
         isIPadDelayedRearStartupActive = false
         iPadRearStartupRequested = false
+        resetFirstFrameReadiness()
         let frontSession = frontSession
         let backSession = backSession
         let multiCamSession = multiCamSession
@@ -763,7 +793,7 @@ class CameraManager: NSObject, ObservableObject {
             if backSession.isRunning {
                 backSession.stopRunning()
             }
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.isSessionRunning = false
             }
         }
@@ -980,12 +1010,26 @@ class CameraManager: NSObject, ObservableObject {
     }
 
     func setPreferredFrameRate(_ frameRate: Int32) async {
-        preferredFrameRate = normalizedFrameRate(frameRate)
+        let normalizedFrameRate = normalizedFrameRate(frameRate)
+        let devices = [frontCamera.device, backCamera.device].compactMap { $0 }
+        if preferredFrameRate == normalizedFrameRate,
+           effectiveFrameRate == normalizedFrameRate,
+           !devices.isEmpty,
+           devices.allSatisfy({ isFrameRateApplied(normalizedFrameRate, to: $0) }) {
+            return
+        }
+        preferredFrameRate = normalizedFrameRate
         applyPreferredFrameRateIfPossible()
     }
 
     private func normalizedFrameRate(_ frameRate: Int32) -> Int32 {
         [24, 30, 60].contains(frameRate) ? frameRate : 30
+    }
+
+    private func isFrameRateApplied(_ frameRate: Int32, to device: AVCaptureDevice) -> Bool {
+        let targetDuration = 1.0 / Double(frameRate)
+        return abs(device.activeVideoMinFrameDuration.seconds - targetDuration) < 0.0005
+            && abs(device.activeVideoMaxFrameDuration.seconds - targetDuration) < 0.0005
     }
 
     private func applyPreferredFrameRateIfPossible() {
@@ -1946,6 +1990,12 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         }
     }
 
+    nonisolated private func noteFirstVideoFrame(isFront: Bool) {
+        Task { @MainActor [weak self] in
+            self?.markFirstVideoFrame(isFront: isFront)
+        }
+    }
+
     nonisolated private func noteIPadFrontFrame() {
         guard isIPadDelayedRearStartupActive else { return }
 
@@ -1991,10 +2041,12 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
 
         if output === frontRef {
             trackMeasuredFrameRate(sampleBuffer: sampleBuffer, isFront: true)
+            noteFirstVideoFrame(isFront: true)
             noteIPadFrontFrame()
             frontVideoFrameHandler?(sampleBuffer)
         } else if output === backRef {
             trackMeasuredFrameRate(sampleBuffer: sampleBuffer, isFront: false)
+            noteFirstVideoFrame(isFront: false)
             backVideoFrameHandler?(sampleBuffer)
         } else if output === audioRef {
             audioSampleBufferHandler?(sampleBuffer)

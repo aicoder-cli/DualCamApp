@@ -922,7 +922,27 @@ private struct WorkPreview: View {
         } else if let pairedVideoURL = item.pairedVideoURL {
             InlineLivePhotoPreview(stillURL: item.assetURL, pairedVideoURL: pairedVideoURL, fallbackURL: item.thumbnailURL ?? item.assetURL, isActive: isActive)
         } else {
-            WorkThumbnail(url: item.thumbnailURL ?? item.assetURL)
+            WorkPhotoPreview(url: item.assetURL)
+        }
+    }
+}
+
+private struct WorkPhotoPreview: View {
+    let url: URL
+
+    var body: some View {
+        ZStack {
+            Color.black
+
+            if let image = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Image(systemName: "camera.viewfinder")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundColor(.white.opacity(0.48))
+            }
         }
     }
 }

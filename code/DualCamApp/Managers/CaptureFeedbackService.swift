@@ -58,8 +58,8 @@ final class CaptureFeedbackService: ObservableObject {
 
     private let performer: Performer
 
-    init(performer: Performer = .live) {
-        self.performer = performer
+    init(performer: Performer? = nil) {
+        self.performer = performer ?? .live
     }
 
     func perform(_ event: Event, enabled: Bool) {

@@ -3,13 +3,13 @@ import Combine
 import SwiftUI
 import UIKit
 
-struct WorkCameraMetadata: Codable, Equatable {
+nonisolated struct WorkCameraMetadata: Codable, Equatable {
     let resolution: String
     let frameRate: Int
     let dualCaptureMode: String
 }
 
-enum WorkKind: String, Codable, CaseIterable, Identifiable {
+nonisolated enum WorkKind: String, Codable, CaseIterable, Identifiable {
     case video
     case photo
 
@@ -39,7 +39,7 @@ enum WorksFilter: String, CaseIterable, Identifiable {
     }
 }
 
-enum HighQualityRenderStatus: String, Codable, Equatable {
+nonisolated enum HighQualityRenderStatus: String, Codable, Equatable {
     case notStarted
     case rendering
     case paused
@@ -93,7 +93,7 @@ private struct HighQualityRenderJob {
     let backgroundTaskID: UIBackgroundTaskIdentifier
 }
 
-struct WorkItem: Codable, Identifiable, Equatable {
+nonisolated struct WorkItem: Codable, Identifiable, Equatable {
     let id: UUID
     var kind: WorkKind
     var title: String

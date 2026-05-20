@@ -76,12 +76,15 @@ class VideoRecorder: ObservableObject {
         guard recordingState == .idle else { return }
         photoSize = spec.photoSize
         videoSize = spec.videoSize
+        isCompositorPrewarmed = false
     }
     
     // 视频帧缓存
     private var frontFrameBuffer: CVPixelBuffer?
     private var backFrameBuffer: CVPixelBuffer?
     private var latestLayoutSnapshot: RecordingLayoutSnapshot?
+    private var isCompositorPrewarmScheduled = false
+    private var isCompositorPrewarmed = false
     private let frameStateLock = NSLock()
 
     private struct CurrentFrameState {
@@ -124,7 +127,7 @@ class VideoRecorder: ObservableObject {
 
         do {
             try setupAssetWriter()
-            prewarmCompositor()
+            prewarmCompositorIfNeeded()
             nativeMovieRecordingStartedAt = Date()
             nativeMovieLayoutTimeline = [WorkLayoutTimelineEntry(time: .zero, snapshot: initialLayoutSnapshot)]
             recordingState = .recording
@@ -253,7 +256,7 @@ class VideoRecorder: ObservableObject {
 
         do {
             try setupAssetWriter()
-            prewarmCompositor()
+            prewarmCompositorIfNeeded()
             recordingState = .recording
             isRecording = true
             startTime = nil
@@ -400,25 +403,36 @@ class VideoRecorder: ObservableObject {
         }
     }
     
-    private func prewarmCompositor() {
-        processingQueue.sync { [weak self] in
+    func prewarmCompositorIfNeeded() {
+        guard recordingState == .idle || recordingState == .preparing else { return }
+        guard !isCompositorPrewarmScheduled, !isCompositorPrewarmed else { return }
+        isCompositorPrewarmScheduled = true
+
+        processingQueue.async { [weak self] in
             guard let self else { return }
-
-            autoreleasepool {
-                let state = self.currentFrameState()
-
-                guard let frontBuffer = state.frontBuffer,
-                      let snapshot = state.snapshot else {
-                    _ = self.makeOutputPixelBuffer(size: self.videoSize)
-                    return
-                }
-
-                _ = self.renderCompositePixelBuffer(
-                    frontBuffer: frontBuffer,
-                    backBuffer: state.backBuffer,
-                    layoutSnapshot: snapshot
-                )
+            self.runCompositorPrewarm()
+            DispatchQueue.main.async { [weak self] in
+                self?.isCompositorPrewarmScheduled = false
+                self?.isCompositorPrewarmed = true
             }
+        }
+    }
+
+    private func runCompositorPrewarm() {
+        autoreleasepool {
+            let state = currentFrameState()
+
+            guard let frontBuffer = state.frontBuffer,
+                  let snapshot = state.snapshot else {
+                _ = makeOutputPixelBuffer(size: videoSize)
+                return
+            }
+
+            _ = renderCompositePixelBuffer(
+                frontBuffer: frontBuffer,
+                backBuffer: state.backBuffer,
+                layoutSnapshot: snapshot
+            )
         }
     }
 
@@ -447,7 +461,7 @@ class VideoRecorder: ObservableObject {
                 let didComplete = writer.status == .completed
                 if !didComplete {
                     let message = L10n.string("error.video.writeFailed", writer.error?.localizedDescription ?? String(describing: writer.status))
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
                         self?.errorMessage = message
                     }
                 }
@@ -462,6 +476,9 @@ class VideoRecorder: ObservableObject {
         frameStateLock.lock()
         latestLayoutSnapshot = snapshot
         frameStateLock.unlock()
+        if recordingState == .idle {
+            isCompositorPrewarmed = false
+        }
     }
 
     func updateWorkLayout(_ layout: LayoutType) {
@@ -944,8 +961,8 @@ class VideoRecorder: ObservableObject {
                     self.lastLivePhotoFrameTime = shutterTime
                     self.isCapturingLivePhoto = true
 
-                    nonisolated(unsafe) let bufferedFrames = preFrames
-                    nonisolated(unsafe) let stillFrame = shutterFrame
+                    let bufferedFrames = preFrames
+                    let stillFrame = shutterFrame
                     self.mediaWritingQueue.async { [weak self] in
                         guard let self else { return }
 

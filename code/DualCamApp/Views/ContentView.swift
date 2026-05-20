@@ -120,6 +120,12 @@ struct ContentView: View {
         countdownRemaining != nil || countdownTask != nil
     }
 
+    private var canStartCapture: Bool {
+        cameraManager.hasDeliveredRequiredVideoFrames
+            && videoRecorder.recordingState == .idle
+            && !isCountdownActive
+    }
+
     private var mediaOutputSpec: MediaOutputSpec {
         MediaOutputSpec(
             photoAspectRatio: PhotoAspectRatio.from(photoAspectRatioRaw),
@@ -183,6 +189,7 @@ struct ContentView: View {
                         latestWork: worksManager.latestWork,
                         showsSideControls: showsRecordingChrome,
                         isCountingDown: isCountdownActive,
+                        canStartCapture: canStartCapture,
                         onStartRecording: beginCaptureWithOptionalCountdown,
                         onStopRecording: stopActiveRecording,
                         onCancelCountdown: cancelCountdown,
@@ -264,7 +271,7 @@ struct ContentView: View {
             Task<Void, Never> {
                 await cameraManager.setPreferredFrameRate(Int32(frameRate))
                 await cameraManager.startCapture()
-                await cameraManager.setRearZoomFactor(1.0)
+                cameraManager.setRearZoomFactor(1.0)
                 lastRearFocalLength = 1.0
             }
             Task<Void, Never> {
@@ -296,6 +303,11 @@ struct ContentView: View {
         .onChange(of: cameraManager.backCameraReady) { isReady in
             if !isReady {
                 videoRecorder.clearBackFrameBuffer()
+            }
+        }
+        .onChange(of: cameraManager.hasDeliveredRequiredVideoFrames) { isReady in
+            if isReady {
+                updateRecordingLayoutSnapshot()
             }
         }
         .onChange(of: videoRecorder.recordingState) { state in
@@ -564,8 +576,7 @@ struct ContentView: View {
     }
 
     private func beginCaptureWithOptionalCountdown() {
-        guard videoRecorder.recordingState == .idle else { return }
-        guard !isCountdownActive else { return }
+        guard canStartCapture else { return }
 
         let request: PendingCaptureRequest
         if captureMode == .video {
@@ -613,6 +624,7 @@ struct ContentView: View {
 
     private func executeCapture(_ request: PendingCaptureRequest) {
         guard videoRecorder.recordingState == .idle else { return }
+        guard cameraManager.hasDeliveredRequiredVideoFrames else { return }
 
         switch request {
         case .video(let frameRate):
@@ -806,6 +818,9 @@ struct ContentView: View {
         videoRecorder.updateLayoutSnapshot(snapshot)
         videoRecorder.updateNativeMovieRecordingLayout(snapshot)
         videoRecorder.updateWorkLayout(layoutManager.currentLayout)
+        if cameraManager.hasDeliveredRequiredVideoFrames {
+            videoRecorder.prewarmCompositorIfNeeded()
+        }
         return snapshot
     }
 
@@ -1085,6 +1100,7 @@ struct BottomControlBar: View {
     let latestWork: WorkItem?
     let showsSideControls: Bool
     let isCountingDown: Bool
+    let canStartCapture: Bool
     let onStartRecording: () -> Void
     let onStopRecording: () -> Void
     let onCancelCountdown: () -> Void
@@ -1105,6 +1121,7 @@ struct BottomControlBar: View {
                 recordingState: recordingState,
                 captureMode: captureMode,
                 isCountingDown: isCountingDown,
+                canStartCapture: canStartCapture,
                 onStart: onStartRecording,
                 onStop: onStopRecording,
                 onCancelCountdown: onCancelCountdown
@@ -1166,6 +1183,7 @@ struct RecordButton: View {
     let recordingState: RecordingState
     let captureMode: CaptureMode
     let isCountingDown: Bool
+    let canStartCapture: Bool
     let onStart: () -> Void
     let onStop: () -> Void
     let onCancelCountdown: () -> Void
@@ -1183,7 +1201,7 @@ struct RecordButton: View {
                     onCancelCountdown()
                 } else if isRecording {
                     onStop()
-                } else {
+                } else if canStartCapture {
                     onStart()
                 }
             }
@@ -1223,7 +1241,9 @@ struct RecordButton: View {
                 }
             }
             .scaleEffect(isPressed ? 0.9 : 1.0)
+            .opacity(canStartCapture || isRecording || isCountingDown ? 1 : 0.48)
         }
+        .disabled(!canStartCapture && !isRecording && !isCountingDown)
         .pressAction(onPress: { withAnimation(.easeInOut(duration: 0.12)) { isPressed = true } },
                       onRelease: { withAnimation(.easeInOut(duration: 0.12)) { isPressed = false } })
         .onAppear { updatePulseAnimation(isRecording: isRecording) }

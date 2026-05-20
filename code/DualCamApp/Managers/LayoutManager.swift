@@ -70,7 +70,7 @@ enum LayoutType: String, CaseIterable, Identifiable {
 }
 
 /// 摄像头裁剪形状
-enum CameraClipShape: String, Codable, CaseIterable, Identifiable {
+nonisolated enum CameraClipShape: String, Codable, CaseIterable, Identifiable {
     case rectangle
     case roundedRectangle
     case circle
@@ -90,7 +90,7 @@ enum CameraClipShape: String, Codable, CaseIterable, Identifiable {
 }
 
 /// 单个摄像头视图的布局信息
-struct CameraLayoutInfo: Codable, Equatable {
+nonisolated struct CameraLayoutInfo: Codable, Equatable {
     var frame: CGRect
     var zIndex: Double
     var cornerRadius: CGFloat
@@ -98,13 +98,13 @@ struct CameraLayoutInfo: Codable, Equatable {
     var clipShape: CameraClipShape
 }
 
-struct RecordingLayoutSnapshot: Codable, Equatable {
+nonisolated struct RecordingLayoutSnapshot: Codable, Equatable {
     let front: CameraLayoutInfo
     let back: CameraLayoutInfo
     let outputSize: CGSize
 }
 
-struct WorkLayoutTimelineEntry: Codable, Equatable {
+nonisolated struct WorkLayoutTimelineEntry: Codable, Equatable {
     let seconds: Double
     let snapshot: RecordingLayoutSnapshot
 
