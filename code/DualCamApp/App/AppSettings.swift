@@ -8,6 +8,7 @@ enum SettingsKey {
     static let defaultLayout = "defaultLayout"
     static let rememberLastLayout = "rememberLastLayout"
     static let lastLayout = "lastLayout"
+    static let photoAspectRatio = "photoAspectRatio"
     static let videoResolution = "videoResolution"
     static let shootingFrameRate = "shootingFrameRate"
     static let videoCodec = "videoCodec"
@@ -42,7 +43,8 @@ enum AppSettings {
             SettingsKey.defaultLayout: LayoutType.pictureInPicture.rawValue,
             SettingsKey.rememberLastLayout: true,
             SettingsKey.lastLayout: LayoutType.pictureInPicture.rawValue,
-            SettingsKey.videoResolution: VideoResolution.p720.rawValue,
+            SettingsKey.photoAspectRatio: PhotoAspectRatio.threeByFour.rawValue,
+            SettingsKey.videoResolution: VideoResolution.p1080.rawValue,
             SettingsKey.shootingFrameRate: ShootingFrameRate.standard.rawValue,
             SettingsKey.videoCodec: VideoCodec.h264.rawValue,
             SettingsKey.defaultLivePhotoDuration: 2.5,
@@ -87,6 +89,45 @@ enum DefaultCaptureMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum PhotoAspectRatio: String, CaseIterable, Identifiable {
+    case threeByFour
+    case nineBySixteen
+
+    var id: String { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .threeByFour: return "settings.photoAspectRatio.3x4"
+        case .nineBySixteen: return "settings.photoAspectRatio.9x16"
+        }
+    }
+
+    var descriptionKey: LocalizedStringKey? {
+        switch self {
+        case .threeByFour: return "settings.photoAspectRatio.3x4.description"
+        case .nineBySixteen: return "settings.photoAspectRatio.9x16.description"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .threeByFour: return "3:4"
+        case .nineBySixteen: return "9:16"
+        }
+    }
+
+    var outputSize: CGSize {
+        switch self {
+        case .threeByFour: return CGSize(width: 1080, height: 1440)
+        case .nineBySixteen: return CGSize(width: 1080, height: 1920)
+        }
+    }
+
+    static func from(_ rawValue: String) -> PhotoAspectRatio {
+        PhotoAspectRatio(rawValue: rawValue) ?? .threeByFour
+    }
+}
+
 enum VideoResolution: String, CaseIterable, Identifiable {
     case p720
     case p1080
@@ -107,8 +148,48 @@ enum VideoResolution: String, CaseIterable, Identifiable {
         }
     }
 
+    var outputSize: CGSize {
+        switch self {
+        case .p720: return CGSize(width: 720, height: 1280)
+        case .p1080: return CGSize(width: 1080, height: 1920)
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .p720: return "720P"
+        case .p1080: return "1080P"
+        }
+    }
+
     static func from(_ rawValue: String) -> VideoResolution {
-        VideoResolution(rawValue: rawValue) ?? .p720
+        VideoResolution(rawValue: rawValue) ?? .p1080
+    }
+}
+
+struct MediaOutputSpec: Equatable {
+    let photoAspectRatio: PhotoAspectRatio
+    let videoResolution: VideoResolution
+    let frameRate: Int
+    let videoCodec: VideoCodec
+
+    var photoSize: CGSize { photoAspectRatio.outputSize }
+    var videoSize: CGSize { videoResolution.outputSize }
+
+    var photoBadgeText: String {
+        "\(photoAspectRatio.shortLabel) · JPEG · \(Self.sizeText(photoSize))"
+    }
+
+    var videoBadgeText: String {
+        "\(videoResolution.shortLabel) · MP4 · \(frameRate)"
+    }
+
+    var settingsSummaryText: String {
+        "Photo \(Self.sizeText(photoSize)) · Video \(Self.sizeText(videoSize))"
+    }
+
+    static func sizeText(_ size: CGSize) -> String {
+        "\(Int(size.width))×\(Int(size.height))"
     }
 }
 

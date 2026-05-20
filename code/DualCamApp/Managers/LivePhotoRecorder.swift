@@ -150,9 +150,7 @@ final class LivePhotoRecorder: @unchecked Sendable {
             throw NSError(domain: "DualCamApp", code: -31, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.noMotionFrames")])
         }
 
-        videoInput.markAsFinished()
-        audioInput?.markAsFinished()
-        metadataInput?.markAsFinished()
+        markInputsAsFinished()
 
         try await withCheckedThrowingContinuation { continuation in
             assetWriter.finishWriting { [self] in
@@ -163,6 +161,26 @@ final class LivePhotoRecorder: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    func finishSynchronously() throws {
+        guard hasStarted else {
+            throw NSError(domain: "DualCamApp", code: -31, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.noMotionFrames")])
+        }
+
+        markInputsAsFinished()
+        let semaphore = DispatchSemaphore(value: 0)
+        assetWriter.finishWriting { semaphore.signal() }
+        semaphore.wait()
+        guard assetWriter.status == .completed else {
+            throw assetWriter.error ?? NSError(domain: "DualCamApp", code: -32, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.videoWriteFailed")])
+        }
+    }
+
+    private func markInputsAsFinished() {
+        videoInput.markAsFinished()
+        audioInput?.markAsFinished()
+        metadataInput?.markAsFinished()
     }
 
     static func writeStillImage(_ image: UIImage, to url: URL, assetIdentifier: String) throws {

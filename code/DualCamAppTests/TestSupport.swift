@@ -30,6 +30,13 @@ enum TestSupport {
         thumbnailURL: URL? = nil,
         assetURL: URL = URL(fileURLWithPath: "/tmp/dual_camera_test.mp4"),
         pairedVideoURL: URL? = nil,
+        frontOriginalURL: URL? = nil,
+        backOriginalURL: URL? = nil,
+        highQualityURL: URL? = nil,
+        highQualityRenderStatus: HighQualityRenderStatus = .notStarted,
+        highQualityRenderProgress: Double = 0,
+        highQualityRenderMessage: String? = nil,
+        layoutTimeline: [WorkLayoutTimelineEntry] = [],
         cameraMetadata: WorkCameraMetadata = WorkCameraMetadata(resolution: "720×1280", frameRate: 30, dualCaptureMode: "DualCam")
     ) -> WorkItem {
         WorkItem(
@@ -42,6 +49,13 @@ enum TestSupport {
             thumbnailURL: thumbnailURL,
             assetURL: assetURL,
             pairedVideoURL: pairedVideoURL,
+            frontOriginalURL: frontOriginalURL,
+            backOriginalURL: backOriginalURL,
+            highQualityURL: highQualityURL,
+            highQualityRenderStatus: highQualityRenderStatus,
+            highQualityRenderProgress: highQualityRenderProgress,
+            highQualityRenderMessage: highQualityRenderMessage,
+            layoutTimeline: layoutTimeline,
             cameraMetadata: cameraMetadata
         )
     }

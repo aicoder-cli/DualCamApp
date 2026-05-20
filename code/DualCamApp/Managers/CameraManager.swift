@@ -10,7 +10,7 @@ import Combine
 import UIKit
 
 /// 摄像头类型
-enum CameraType {
+enum CameraType: Hashable {
     case front
     case back
 }
@@ -23,6 +23,8 @@ struct CameraConfiguration {
     var device: AVCaptureDevice?
     var input: AVCaptureDeviceInput?
     var output: AVCaptureVideoDataOutput?
+    var photoOutput: AVCapturePhotoOutput?
+    var movieOutput: AVCaptureMovieFileOutput?
     var connection: AVCaptureConnection?
 }
 
@@ -69,6 +71,56 @@ enum RearLensKind: String, CaseIterable {
         case .ultra: return "focal.lens.ultraWide"
         case .wide: return "focal.lens.wide"
         case .tele: return "focal.lens.telephoto"
+        }
+    }
+}
+
+enum NativeOutputStatus: Equatable {
+    case pending
+    case ready
+    case fallback(String)
+}
+
+struct NativePhotoPair {
+    let frontData: Data
+    let backData: Data?
+}
+
+struct NativeLivePhotoCapture {
+    let photoData: Data
+    let movieURL: URL
+    let photoDisplayTime: CMTime
+}
+
+struct NativeLivePhotoPair {
+    let front: NativeLivePhotoCapture
+    let back: NativeLivePhotoCapture?
+}
+
+struct NativeMoviePair {
+    let frontURL: URL
+    let backURL: URL?
+}
+
+enum NativeOutputError: LocalizedError {
+    case photoOutputUnavailable
+    case photoDataUnavailable
+    case movieOutputUnavailable
+    case movieRecordingNotActive
+    case livePhotoOutputUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .photoOutputUnavailable:
+            return "Native photo output is unavailable."
+        case .photoDataUnavailable:
+            return "Native photo data is unavailable."
+        case .movieOutputUnavailable:
+            return "Native movie output is unavailable."
+        case .movieRecordingNotActive:
+            return "Native movie recording is not active."
+        case .livePhotoOutputUnavailable:
+            return "Native Live Photo output is unavailable."
         }
     }
 }
@@ -215,6 +267,128 @@ struct RearFocalCapability: Equatable {
     }
 }
 
+private struct ActiveNativeMovieRecording {
+    let frontOutput: AVCaptureMovieFileOutput
+    let frontDelegate: NativeMovieCaptureDelegate
+    let backOutput: AVCaptureMovieFileOutput?
+    let backDelegate: NativeMovieCaptureDelegate?
+}
+
+private final class NativePhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+    private let completion: (Result<Data, Error>) -> Void
+
+    init(completion: @escaping (Result<Data, Error>) -> Void) {
+        self.completion = completion
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        if let error {
+            completion(.failure(error))
+            return
+        }
+
+        guard let data = photo.fileDataRepresentation() else {
+            completion(.failure(NativeOutputError.photoDataUnavailable))
+            return
+        }
+
+        completion(.success(data))
+    }
+}
+
+private final class NativeLivePhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+    private let movieURL: URL
+    private let completion: (Result<NativeLivePhotoCapture, Error>) -> Void
+    private var photoData: Data?
+    private var photoDisplayTime = CMTime.zero
+    private var captureError: Error?
+
+    init(movieURL: URL, completion: @escaping (Result<NativeLivePhotoCapture, Error>) -> Void) {
+        self.movieURL = movieURL
+        self.completion = completion
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        if let error {
+            captureError = error
+            return
+        }
+        photoData = photo.fileDataRepresentation()
+        if photoData == nil {
+            captureError = NativeOutputError.photoDataUnavailable
+        }
+    }
+
+    func photoOutput(
+        _ output: AVCapturePhotoOutput,
+        didFinishProcessingLivePhotoToMovieFileAt outputFileURL: URL,
+        duration: CMTime,
+        photoDisplayTime: CMTime,
+        resolvedSettings: AVCaptureResolvedPhotoSettings,
+        error: Error?
+    ) {
+        if let error {
+            captureError = error
+            return
+        }
+        self.photoDisplayTime = photoDisplayTime.isValid && photoDisplayTime.isNumeric ? photoDisplayTime : .zero
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
+        if let error {
+            completion(.failure(error))
+            return
+        }
+        if let captureError {
+            completion(.failure(captureError))
+            return
+        }
+        guard let photoData,
+              FileManager.default.fileExists(atPath: movieURL.path) else {
+            completion(.failure(NativeOutputError.livePhotoOutputUnavailable))
+            return
+        }
+        completion(.success(NativeLivePhotoCapture(photoData: photoData, movieURL: movieURL, photoDisplayTime: photoDisplayTime)))
+    }
+}
+
+private final class NativeMovieCaptureDelegate: NSObject, AVCaptureFileOutputRecordingDelegate {
+    private var result: Result<URL, Error>?
+    private var continuation: CheckedContinuation<URL, Error>?
+
+    func fileOutput(
+        _ output: AVCaptureFileOutput,
+        didFinishRecordingTo outputFileURL: URL,
+        from connections: [AVCaptureConnection],
+        error: Error?
+    ) {
+        complete(error.map { .failure($0) } ?? .success(outputFileURL))
+    }
+
+    func waitForCompletion() async throws -> URL {
+        if let result {
+            return try result.get()
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            if let result {
+                continuation.resume(with: result)
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    private func complete(_ result: Result<URL, Error>) {
+        if let continuation {
+            continuation.resume(with: result)
+            self.continuation = nil
+        } else {
+            self.result = result
+        }
+    }
+}
+
 /// 多摄像头管理器
 @MainActor
 class CameraManager: NSObject, ObservableObject {
@@ -229,6 +403,7 @@ class CameraManager: NSObject, ObservableObject {
     @Published var preferredFrameRate: Int32 = 30
     @Published var effectiveFrameRate: Int32 = 30
     @Published var frameRateDebugInfo = L10n.string("debug.fps.waiting")
+    @Published var nativeOutputStatus: NativeOutputStatus = .pending
     @Published var rearFocalCapability = RearFocalCapability.fallback
     @Published var rearZoomFactor: CGFloat = 1
 
@@ -290,6 +465,9 @@ class CameraManager: NSObject, ObservableObject {
     nonisolated(unsafe) private var iPadLastFrontFrameTime: TimeInterval = 0
     nonisolated(unsafe) private var iPadRearStartupRequested = false
     nonisolated(unsafe) private var iPadRearFallbackTriggered = false
+    private var activePhotoCaptureDelegates: [UUID: NativePhotoCaptureDelegate] = [:]
+    private var activeLivePhotoCaptureDelegates: [UUID: NativeLivePhotoCaptureDelegate] = [:]
+    private var activeNativeMovieRecording: ActiveNativeMovieRecording?
 
     // 视频帧回调
     nonisolated(unsafe) var frontVideoFrameHandler: ((CMSampleBuffer) -> Void)?
@@ -335,6 +513,7 @@ class CameraManager: NSObject, ObservableObject {
         isBackCameraConfigured = false
         _frontVideoOutput = nil
         _backVideoOutput = nil
+        nativeOutputStatus = .pending
         configurePreviewLayers(frontPreviewLayer: frontPreviewLayer, backPreviewLayer: backPreviewLayer)
     }
 
@@ -608,10 +787,196 @@ class CameraManager: NSObject, ObservableObject {
     private func refreshVideoOrientations() {
         configureVideoConnection(frontCamera.connection, cameraType: .front)
         configureVideoConnection(frontCamera.output?.connection(with: .video), cameraType: .front)
+        configureVideoConnection(frontCamera.photoOutput?.connection(with: .video), cameraType: .front)
+        configureVideoConnection(frontCamera.movieOutput?.connection(with: .video), cameraType: .front)
         configureVideoConnection(frontCamera.previewLayer.connection, cameraType: .front)
         configureVideoConnection(backCamera.connection, cameraType: .back)
         configureVideoConnection(backCamera.output?.connection(with: .video), cameraType: .back)
+        configureVideoConnection(backCamera.photoOutput?.connection(with: .video), cameraType: .back)
+        configureVideoConnection(backCamera.movieOutput?.connection(with: .video), cameraType: .back)
         configureVideoConnection(backCamera.previewLayer.connection, cameraType: .back)
+    }
+
+    private func installNativeOutputs(on session: AVCaptureSession, cameraType: CameraType) {
+        let photoOutput = AVCapturePhotoOutput()
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+            photoOutput.maxPhotoQualityPrioritization = .quality
+            if photoOutput.isLivePhotoCaptureSupported {
+                photoOutput.isLivePhotoCaptureEnabled = true
+            }
+            assignNativePhotoOutput(photoOutput, cameraType: cameraType)
+            configureVideoConnection(photoOutput.connection(with: .video), cameraType: cameraType)
+        }
+
+        let movieOutput = AVCaptureMovieFileOutput()
+        if session.canAddOutput(movieOutput) {
+            session.addOutput(movieOutput)
+            assignNativeMovieOutput(movieOutput, cameraType: cameraType)
+            configureVideoConnection(movieOutput.connection(with: .video), cameraType: cameraType)
+        }
+
+        updateNativeOutputStatus()
+    }
+
+    private func assignNativePhotoOutput(_ output: AVCapturePhotoOutput, cameraType: CameraType) {
+        switch cameraType {
+        case .front:
+            frontCamera.photoOutput = output
+        case .back:
+            backCamera.photoOutput = output
+        }
+    }
+
+    private func assignNativeMovieOutput(_ output: AVCaptureMovieFileOutput, cameraType: CameraType) {
+        switch cameraType {
+        case .front:
+            frontCamera.movieOutput = output
+        case .back:
+            backCamera.movieOutput = output
+        }
+    }
+
+    private func updateNativeOutputStatus() {
+        let hasPhotoOutputs = frontCamera.photoOutput != nil && backCamera.photoOutput != nil
+        let hasMovieOutputs = frontCamera.movieOutput != nil && backCamera.movieOutput != nil
+        if hasPhotoOutputs && hasMovieOutputs {
+            nativeOutputStatus = .ready
+        } else if frontCameraReady || backCameraReady {
+            nativeOutputStatus = .fallback(L10n.string("settings.mediaOutput.fallback.usingFallback"))
+        } else {
+            nativeOutputStatus = .pending
+        }
+    }
+
+    func captureNativePhotoPair() async throws -> NativePhotoPair {
+        guard let frontOutput = frontCamera.photoOutput else {
+            throw NativeOutputError.photoOutputUnavailable
+        }
+
+        async let frontData = captureNativePhotoData(from: frontOutput)
+        if let backOutput = backCamera.photoOutput {
+            async let backData = captureNativePhotoData(from: backOutput)
+            return NativePhotoPair(frontData: try await frontData, backData: try? await backData)
+        }
+        return NativePhotoPair(frontData: try await frontData, backData: nil)
+    }
+
+    private func captureNativePhotoData(from output: AVCapturePhotoOutput) async throws -> Data {
+        let settings = AVCapturePhotoSettings()
+        settings.photoQualityPrioritization = .quality
+
+        let id = UUID()
+        return try await withCheckedThrowingContinuation { continuation in
+            let delegate = NativePhotoCaptureDelegate { [weak self] result in
+                Task { @MainActor in
+                    self?.activePhotoCaptureDelegates[id] = nil
+                    continuation.resume(with: result)
+                }
+            }
+            activePhotoCaptureDelegates[id] = delegate
+            output.capturePhoto(with: settings, delegate: delegate)
+        }
+    }
+
+    func captureNativeLivePhotoPair() async throws -> NativeLivePhotoPair {
+        guard let frontOutput = frontCamera.photoOutput,
+              frontOutput.isLivePhotoCaptureSupported,
+              frontOutput.isLivePhotoCaptureEnabled else {
+            throw NativeOutputError.livePhotoOutputUnavailable
+        }
+
+        async let frontCapture = captureNativeLivePhoto(from: frontOutput, cameraType: .front)
+        if let backOutput = backCamera.photoOutput,
+           backOutput.isLivePhotoCaptureSupported,
+           backOutput.isLivePhotoCaptureEnabled {
+            async let backCapture = captureNativeLivePhoto(from: backOutput, cameraType: .back)
+            return NativeLivePhotoPair(front: try await frontCapture, back: try? await backCapture)
+        }
+        return NativeLivePhotoPair(front: try await frontCapture, back: nil)
+    }
+
+    private func captureNativeLivePhoto(from output: AVCapturePhotoOutput, cameraType: CameraType) async throws -> NativeLivePhotoCapture {
+        let settings = AVCapturePhotoSettings()
+        settings.photoQualityPrioritization = .quality
+        let movieURL = makeNativeLivePhotoTemporaryURL(cameraType: cameraType)
+        removeExistingFile(at: movieURL)
+        settings.livePhotoMovieFileURL = movieURL
+
+        let id = UUID()
+        return try await withCheckedThrowingContinuation { continuation in
+            let delegate = NativeLivePhotoCaptureDelegate(movieURL: movieURL) { [weak self] result in
+                Task { @MainActor in
+                    self?.activeLivePhotoCaptureDelegates[id] = nil
+                    continuation.resume(with: result)
+                }
+            }
+            activeLivePhotoCaptureDelegates[id] = delegate
+            output.capturePhoto(with: settings, delegate: delegate)
+        }
+    }
+
+    func startNativeMovieRecording() throws {
+        guard activeNativeMovieRecording == nil,
+              let frontOutput = frontCamera.movieOutput else {
+            throw NativeOutputError.movieOutputUnavailable
+        }
+
+        let frontDelegate = NativeMovieCaptureDelegate()
+        let frontURL = makeNativeMovieTemporaryURL(cameraType: .front)
+        removeExistingFile(at: frontURL)
+        frontOutput.startRecording(to: frontURL, recordingDelegate: frontDelegate)
+
+        var backOutput: AVCaptureMovieFileOutput?
+        var backDelegate: NativeMovieCaptureDelegate?
+        if let output = backCamera.movieOutput {
+            let delegate = NativeMovieCaptureDelegate()
+            let url = makeNativeMovieTemporaryURL(cameraType: .back)
+            removeExistingFile(at: url)
+            output.startRecording(to: url, recordingDelegate: delegate)
+            backOutput = output
+            backDelegate = delegate
+        }
+
+        activeNativeMovieRecording = ActiveNativeMovieRecording(
+            frontOutput: frontOutput,
+            frontDelegate: frontDelegate,
+            backOutput: backOutput,
+            backDelegate: backDelegate
+        )
+    }
+
+    func stopNativeMovieRecording() async throws -> NativeMoviePair {
+        guard let recording = activeNativeMovieRecording else {
+            throw NativeOutputError.movieRecordingNotActive
+        }
+        activeNativeMovieRecording = nil
+
+        if recording.frontOutput.isRecording {
+            recording.frontOutput.stopRecording()
+        }
+        if recording.backOutput?.isRecording == true {
+            recording.backOutput?.stopRecording()
+        }
+
+        let frontURL = try await recording.frontDelegate.waitForCompletion()
+        let backURL = try await recording.backDelegate?.waitForCompletion()
+        return NativeMoviePair(frontURL: frontURL, backURL: backURL)
+    }
+
+    private func makeNativeMovieTemporaryURL(cameraType: CameraType) -> URL {
+        let name = cameraType == .front ? "front" : "back"
+        return FileManager.default.temporaryDirectory.appendingPathComponent("dualcam_native_\(name)_\(UUID().uuidString).mov")
+    }
+
+    private func makeNativeLivePhotoTemporaryURL(cameraType: CameraType) -> URL {
+        let name = cameraType == .front ? "front" : "back"
+        return FileManager.default.temporaryDirectory.appendingPathComponent("dualcam_native_live_\(name)_\(UUID().uuidString).mov")
+    }
+
+    private func removeExistingFile(at url: URL) {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     func setPreferredFrameRate(_ frameRate: Int32) async {
@@ -1125,6 +1490,32 @@ class CameraManager: NSObject, ObservableObject {
             backCamera.output = backOutput
             _backVideoOutput = backOutput
 
+            let frontPhotoOutput = AVCapturePhotoOutput()
+            if multiCamSession.canAddOutput(frontPhotoOutput) {
+                multiCamSession.addOutputWithNoConnections(frontPhotoOutput)
+                frontPhotoOutput.maxPhotoQualityPrioritization = .quality
+                frontCamera.photoOutput = frontPhotoOutput
+            }
+
+            let backPhotoOutput = AVCapturePhotoOutput()
+            if multiCamSession.canAddOutput(backPhotoOutput) {
+                multiCamSession.addOutputWithNoConnections(backPhotoOutput)
+                backPhotoOutput.maxPhotoQualityPrioritization = .quality
+                backCamera.photoOutput = backPhotoOutput
+            }
+
+            let frontMovieOutput = AVCaptureMovieFileOutput()
+            if multiCamSession.canAddOutput(frontMovieOutput) {
+                multiCamSession.addOutputWithNoConnections(frontMovieOutput)
+                frontCamera.movieOutput = frontMovieOutput
+            }
+
+            let backMovieOutput = AVCaptureMovieFileOutput()
+            if multiCamSession.canAddOutput(backMovieOutput) {
+                multiCamSession.addOutputWithNoConnections(backMovieOutput)
+                backCamera.movieOutput = backMovieOutput
+            }
+
             guard let frontPort = frontInput.ports(for: .video, sourceDeviceType: frontDevice.deviceType, sourceDevicePosition: .front).first,
                   let backPort = backInput.ports(for: .video, sourceDeviceType: backDevice.deviceType, sourceDevicePosition: .back).first else {
                 multiCamSession.commitConfiguration()
@@ -1145,6 +1536,22 @@ class CameraManager: NSObject, ObservableObject {
                 didAddFrontOutputConnection = true
             }
 
+            if let frontPhotoOutput = frontCamera.photoOutput {
+                let connection = AVCaptureConnection(inputPorts: [frontPort], output: frontPhotoOutput)
+                if multiCamSession.canAddConnection(connection) {
+                    multiCamSession.addConnection(connection)
+                    configureVideoConnection(connection, cameraType: .front)
+                }
+            }
+
+            if let frontMovieOutput = frontCamera.movieOutput {
+                let connection = AVCaptureConnection(inputPorts: [frontPort], output: frontMovieOutput)
+                if multiCamSession.canAddConnection(connection) {
+                    multiCamSession.addConnection(connection)
+                    configureVideoConnection(connection, cameraType: .front)
+                }
+            }
+
             let frontPreviewConnection = AVCaptureConnection(inputPort: frontPort, videoPreviewLayer: frontCamera.previewLayer)
             if multiCamSession.canAddConnection(frontPreviewConnection) {
                 multiCamSession.addConnection(frontPreviewConnection)
@@ -1158,6 +1565,22 @@ class CameraManager: NSObject, ObservableObject {
                 backCamera.connection = backOutputConnection
                 configureVideoConnection(backOutputConnection, cameraType: .back)
                 didAddBackOutputConnection = true
+            }
+
+            if let backPhotoOutput = backCamera.photoOutput {
+                let connection = AVCaptureConnection(inputPorts: [backPort], output: backPhotoOutput)
+                if multiCamSession.canAddConnection(connection) {
+                    multiCamSession.addConnection(connection)
+                    configureVideoConnection(connection, cameraType: .back)
+                }
+            }
+
+            if let backMovieOutput = backCamera.movieOutput {
+                let connection = AVCaptureConnection(inputPorts: [backPort], output: backMovieOutput)
+                if multiCamSession.canAddConnection(connection) {
+                    multiCamSession.addConnection(connection)
+                    configureVideoConnection(connection, cameraType: .back)
+                }
             }
 
             let backPreviewConnection = AVCaptureConnection(inputPort: backPort, videoPreviewLayer: backCamera.previewLayer)
@@ -1211,6 +1634,7 @@ class CameraManager: NSObject, ObservableObject {
             isAudioConfigured = audioOutput != nil
             frontCameraReady = true
             backCameraReady = true
+            updateNativeOutputStatus()
 
         } catch {
             multiCamSession.commitConfiguration()
@@ -1276,6 +1700,7 @@ class CameraManager: NSObject, ObservableObject {
             }
             frontCamera.connection = connection
             configureVideoConnection(connection, cameraType: .front)
+            installNativeOutputs(on: frontSession, cameraType: .front)
 
             frontSession.commitConfiguration()
             isFrontCameraConfigured = CameraDeviceSelection.isSingleSessionCameraReady(
@@ -1284,6 +1709,7 @@ class CameraManager: NSObject, ObservableObject {
                 hasVideoConnection: true
             )
             frontCameraReady = isFrontCameraConfigured
+            updateNativeOutputStatus()
 
         } catch {
             frontSession.commitConfiguration()
@@ -1344,6 +1770,7 @@ class CameraManager: NSObject, ObservableObject {
             }
             backCamera.connection = connection
             configureVideoConnection(connection, cameraType: .back)
+            installNativeOutputs(on: backSession, cameraType: .back)
 
             backSession.commitConfiguration()
             isBackCameraConfigured = CameraDeviceSelection.isSingleSessionCameraReady(
@@ -1352,6 +1779,7 @@ class CameraManager: NSObject, ObservableObject {
                 hasVideoConnection: true
             )
             backCameraReady = isBackCameraConfigured
+            updateNativeOutputStatus()
 
         } catch {
             backSession.commitConfiguration()

@@ -10,7 +10,8 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.defaultCaptureMode) private var defaultCaptureModeRaw = DefaultCaptureMode.video.rawValue
     @AppStorage(SettingsKey.defaultLayout) private var defaultLayoutRaw = LayoutType.pictureInPicture.rawValue
     @AppStorage(SettingsKey.rememberLastLayout) private var rememberLastLayout = true
-    @AppStorage(SettingsKey.videoResolution) private var videoResolutionRaw = VideoResolution.p720.rawValue
+    @AppStorage(SettingsKey.photoAspectRatio) private var photoAspectRatioRaw = PhotoAspectRatio.threeByFour.rawValue
+    @AppStorage(SettingsKey.videoResolution) private var videoResolutionRaw = VideoResolution.p1080.rawValue
     @AppStorage(SettingsKey.videoCodec) private var videoCodecRaw = VideoCodec.h264.rawValue
     @AppStorage(SettingsKey.immersiveRecording) private var immersiveRecording = true
     @AppStorage(SettingsKey.controlRevealSeconds) private var controlRevealSeconds = ControlRevealDuration.twoSeconds.rawValue
@@ -20,6 +21,15 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.workNamingRule) private var workNamingRuleRaw = WorkNamingRule.dateLayout.rawValue
     @AppStorage(SettingsKey.autoClearCache) private var autoClearCache = false
     @Environment(\.dismiss) private var dismiss
+
+    private var mediaOutputSpec: MediaOutputSpec {
+        MediaOutputSpec(
+            photoAspectRatio: PhotoAspectRatio.from(photoAspectRatioRaw),
+            videoResolution: VideoResolution.from(videoResolutionRaw),
+            frameRate: shootingFrameRate,
+            videoCodec: VideoCodec.from(videoCodecRaw)
+        )
+    }
 
     var body: some View {
         NavigationView {
@@ -109,51 +119,19 @@ struct SettingsView: View {
     private var videoPhotoSection: some View {
         SettingsSectionCard(titleKey: "settings.section.videoPhoto", footerKey: "settings.appliesNextRecording") {
             SettingsNavigationRow(
-                titleKey: "settings.videoResolution.title",
-                subtitleKey: "settings.videoResolution.subtitle",
-                value: AnyView(Text(VideoResolution.from(videoResolutionRaw).titleKey))
+                titleKey: "settings.mediaOutput.title",
+                subtitleKey: "settings.mediaOutput.subtitle",
+                value: AnyView(Text(mediaOutputSpec.settingsSummaryText))
             ) {
-                SettingsStringOptionDetailView(
-                    titleKey: "settings.videoResolution.title",
-                    subtitleKey: "settings.videoResolution.subtitle",
-                    selection: $videoResolutionRaw,
-                    options: VideoResolution.allCases,
-                    rawValue: { $0.rawValue },
-                    titleKeyForOption: { $0.titleKey },
-                    descriptionKeyForOption: { $0.descriptionKey }
+                MediaOutputDetailView(
+                    photoAspectRatioRaw: $photoAspectRatioRaw,
+                    videoResolutionRaw: $videoResolutionRaw,
+                    videoCodecRaw: $videoCodecRaw,
+                    defaultLivePhotoDuration: $defaultLivePhotoDuration,
+                    shootingFrameRate: $shootingFrameRate,
+                    effectiveFrameRate: cameraManager.effectiveFrameRate,
+                    nativeOutputStatus: cameraManager.nativeOutputStatus
                 )
-            }
-
-            SettingsNavigationRow(
-                titleKey: "settings.frameRate.title",
-                subtitleKey: "settings.frameRate.subtitle",
-                value: AnyView(Text("\(shootingFrameRate) fps"))
-            ) {
-                SettingsFrameRateDetailView(selection: $shootingFrameRate)
-            }
-
-            SettingsNavigationRow(
-                titleKey: "settings.videoCodec.title",
-                subtitleKey: "settings.videoCodec.subtitle",
-                value: AnyView(Text(VideoCodec.from(videoCodecRaw).titleKey))
-            ) {
-                SettingsStringOptionDetailView(
-                    titleKey: "settings.videoCodec.title",
-                    subtitleKey: "settings.videoCodec.subtitle",
-                    selection: $videoCodecRaw,
-                    options: VideoCodec.allCases,
-                    rawValue: { $0.rawValue },
-                    titleKeyForOption: { $0.titleKey },
-                    descriptionKeyForOption: { $0.descriptionKey }
-                )
-            }
-
-            SettingsNavigationRow(
-                titleKey: "settings.livePhotoDuration.title",
-                subtitleKey: "settings.livePhotoDuration.subtitle",
-                value: AnyView(Text(LivePhotoDurationOption.from(seconds: defaultLivePhotoDuration).titleKey))
-            ) {
-                SettingsLivePhotoDurationDetailView(selection: $defaultLivePhotoDuration)
             }
 
             SettingsStaticValueRow(
@@ -448,6 +426,130 @@ private struct SettingsSwitchRow: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct MediaOutputDetailView: View {
+    @Binding var photoAspectRatioRaw: String
+    @Binding var videoResolutionRaw: String
+    @Binding var videoCodecRaw: String
+    @Binding var defaultLivePhotoDuration: Double
+    @Binding var shootingFrameRate: Int
+    let effectiveFrameRate: Int32
+    let nativeOutputStatus: NativeOutputStatus
+    @Environment(\.dismiss) private var dismiss
+
+    private var mediaOutputSpec: MediaOutputSpec {
+        MediaOutputSpec(
+            photoAspectRatio: PhotoAspectRatio.from(photoAspectRatioRaw),
+            videoResolution: VideoResolution.from(videoResolutionRaw),
+            frameRate: shootingFrameRate,
+            videoCodec: VideoCodec.from(videoCodecRaw)
+        )
+    }
+
+    private var nativeOutputStatusText: String {
+        switch nativeOutputStatus {
+        case .pending:
+            return L10n.string("settings.mediaOutput.fallback.pending")
+        case .ready:
+            return L10n.string("settings.mediaOutput.fallback.ready")
+        case .fallback(let reason):
+            return reason
+        }
+    }
+
+    var body: some View {
+        SettingsBackground {
+            VStack(spacing: 0) {
+                SettingsDetailTopBar(dismiss: dismiss)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        SettingsHero(titleKey: "settings.mediaOutput.title", subtitleKey: "settings.mediaOutput.subtitle")
+
+                        SettingsSectionCard(titleKey: "settings.mediaOutput.effective") {
+                            SettingsStaticValueRow(titleKey: "settings.mediaOutput.effective", subtitleKey: nil) {
+                                Text(mediaOutputSpec.settingsSummaryText)
+                            }
+                            SettingsStaticValueRow(titleKey: "settings.mediaOutput.format", subtitleKey: "settings.videoCodec.subtitle") {
+                                Text("settings.mediaOutput.format.compatible")
+                            }
+                            SettingsStaticValueRow(titleKey: "settings.mediaOutput.fallback", subtitleKey: nil) {
+                                Text(nativeOutputStatusText)
+                            }
+                        }
+
+                        SettingsSectionCard(titleKey: "settings.section.videoPhoto") {
+                            SettingsNavigationRow(
+                                titleKey: "settings.photoAspectRatio.title",
+                                subtitleKey: "settings.photoAspectRatio.subtitle",
+                                value: AnyView(Text(PhotoAspectRatio.from(photoAspectRatioRaw).titleKey))
+                            ) {
+                                SettingsStringOptionDetailView(
+                                    titleKey: "settings.photoAspectRatio.title",
+                                    subtitleKey: "settings.photoAspectRatio.subtitle",
+                                    selection: $photoAspectRatioRaw,
+                                    options: PhotoAspectRatio.allCases,
+                                    rawValue: { $0.rawValue },
+                                    titleKeyForOption: { $0.titleKey },
+                                    descriptionKeyForOption: { $0.descriptionKey }
+                                )
+                            }
+
+                            SettingsNavigationRow(
+                                titleKey: "settings.videoResolution.title",
+                                subtitleKey: "settings.videoResolution.subtitle",
+                                value: AnyView(Text(VideoResolution.from(videoResolutionRaw).titleKey))
+                            ) {
+                                SettingsStringOptionDetailView(
+                                    titleKey: "settings.videoResolution.title",
+                                    subtitleKey: "settings.videoResolution.subtitle",
+                                    selection: $videoResolutionRaw,
+                                    options: VideoResolution.allCases,
+                                    rawValue: { $0.rawValue },
+                                    titleKeyForOption: { $0.titleKey },
+                                    descriptionKeyForOption: { $0.descriptionKey }
+                                )
+                            }
+
+                            SettingsNavigationRow(
+                                titleKey: "settings.frameRate.title",
+                                subtitleKey: "settings.frameRate.subtitle",
+                                value: AnyView(Text("\(shootingFrameRate) fps"))
+                            ) {
+                                SettingsFrameRateDetailView(selection: $shootingFrameRate)
+                            }
+
+                            SettingsStaticValueRow(
+                                titleKey: "settings.effectiveFrameRate",
+                                subtitleKey: "settings.effectiveFrameRate.subtitle"
+                            ) {
+                                Text("\(effectiveFrameRate) fps")
+                            }
+
+                            SettingsStaticValueRow(
+                                titleKey: "settings.mediaOutput.liveCanvas",
+                                subtitleKey: "settings.livePhotoDuration.subtitle"
+                            ) {
+                                Text("settings.mediaOutput.liveCanvas.followPhoto")
+                            }
+
+                            SettingsNavigationRow(
+                                titleKey: "settings.livePhotoDuration.title",
+                                subtitleKey: "settings.livePhotoDuration.subtitle",
+                                value: AnyView(Text(LivePhotoDurationOption.from(seconds: defaultLivePhotoDuration).titleKey))
+                            ) {
+                                SettingsLivePhotoDurationDetailView(selection: $defaultLivePhotoDuration)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 28)
+                }
+            }
+        }
+        .navigationBarHidden(true)
     }
 }
 

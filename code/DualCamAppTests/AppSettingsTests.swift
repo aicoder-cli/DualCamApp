@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import XCTest
 @testable import DualCamApp
@@ -28,7 +29,8 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(userDefaults.string(forKey: SettingsKey.defaultLayout), LayoutType.pictureInPicture.rawValue)
         XCTAssertTrue(userDefaults.bool(forKey: SettingsKey.rememberLastLayout))
         XCTAssertEqual(userDefaults.string(forKey: SettingsKey.lastLayout), LayoutType.pictureInPicture.rawValue)
-        XCTAssertEqual(userDefaults.string(forKey: SettingsKey.videoResolution), VideoResolution.p720.rawValue)
+        XCTAssertEqual(userDefaults.string(forKey: SettingsKey.photoAspectRatio), PhotoAspectRatio.threeByFour.rawValue)
+        XCTAssertEqual(userDefaults.string(forKey: SettingsKey.videoResolution), VideoResolution.p1080.rawValue)
         XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.shootingFrameRate), ShootingFrameRate.standard.rawValue)
         XCTAssertEqual(userDefaults.string(forKey: SettingsKey.videoCodec), VideoCodec.h264.rawValue)
         XCTAssertEqual(userDefaults.double(forKey: SettingsKey.defaultLivePhotoDuration), 2.5)
@@ -62,11 +64,28 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(AppLanguage.from("bad"), .system)
         XCTAssertEqual(DefaultCaptureMode.from("bad"), .video)
         XCTAssertEqual(LayoutType.from("bad"), .pictureInPicture)
-        XCTAssertEqual(VideoResolution.from("bad"), .p720)
+        XCTAssertEqual(PhotoAspectRatio.from("bad"), .threeByFour)
+        XCTAssertEqual(VideoResolution.from("bad"), .p1080)
         XCTAssertEqual(VideoCodec.from("bad"), .h264)
         XCTAssertEqual(ControlRevealDuration.from(-1), .twoSeconds)
         XCTAssertEqual(RecordingCountdown.from(-1), .off)
         XCTAssertEqual(WorkNamingRule.from("bad"), .dateLayout)
+    }
+
+    func testMediaOutputSizesMatchNativeLikeDefaults() {
+        XCTAssertEqual(PhotoAspectRatio.threeByFour.outputSize, CGSize(width: 1080, height: 1440))
+        XCTAssertEqual(PhotoAspectRatio.nineBySixteen.outputSize, CGSize(width: 1080, height: 1920))
+        XCTAssertEqual(VideoResolution.p720.outputSize, CGSize(width: 720, height: 1280))
+        XCTAssertEqual(VideoResolution.p1080.outputSize, CGSize(width: 1080, height: 1920))
+
+        let spec = MediaOutputSpec(
+            photoAspectRatio: .threeByFour,
+            videoResolution: .p1080,
+            frameRate: 30,
+            videoCodec: .h264
+        )
+        XCTAssertEqual(spec.photoBadgeText, "3:4 · JPEG · 1080×1440")
+        XCTAssertEqual(spec.videoBadgeText, "1080P · MP4 · 30")
     }
 
     func testLivePhotoDurationOptionChoosesNearestValue() {

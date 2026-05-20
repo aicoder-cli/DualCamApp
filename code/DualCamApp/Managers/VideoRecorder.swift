@@ -37,6 +37,9 @@ class VideoRecorder: ObservableObject {
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     
     private var isRecording = false
+    private var isNativeMovieRecordingActive = false
+    private var nativeMovieRecordingStartedAt: Date?
+    private var nativeMovieLayoutTimeline: [WorkLayoutTimelineEntry] = []
     private var startTime: CMTime?
     private var lastFrameTime: CMTime?
     private var frameDuration = CMTime(value: 1, timescale: 30)
@@ -46,7 +49,8 @@ class VideoRecorder: ObservableObject {
     private var latestFramePresentationTime: CMTime?
 
     private var outputURL: URL?
-    private let videoSize: CGSize
+    private var photoSize: CGSize
+    private var videoSize: CGSize
     private var frameRate: Int32 = 30
     private var latestLayoutIdentifier = LayoutType.pictureInPicture.rawValue
     var workCompletedHandler: ((RecordedWorkDraft) -> Void)?
@@ -65,7 +69,14 @@ class VideoRecorder: ObservableObject {
     private var livePhotoCaptureEndTime: CMTime?
     private var livePhotoAudioPrebuffer: [LivePhotoBufferedAudioSample] = []
 
+    var outputPhotoSize: CGSize { photoSize }
     var outputVideoSize: CGSize { videoSize }
+
+    func applyOutputSpec(_ spec: MediaOutputSpec) {
+        guard recordingState == .idle else { return }
+        photoSize = spec.photoSize
+        videoSize = spec.videoSize
+    }
     
     // 视频帧缓存
     private var frontFrameBuffer: CVPixelBuffer?
@@ -98,12 +109,139 @@ class VideoRecorder: ObservableObject {
     
     // MARK: - Initialization
     init() {
-        // 默认视频尺寸 (720p portrait)
-        videoSize = CGSize(width: 720, height: 1280)
+        photoSize = PhotoAspectRatio.threeByFour.outputSize
+        videoSize = VideoResolution.p1080.outputSize
     }
     
     // MARK: - Recording Control
-    
+
+    @MainActor
+    func startNativeMovieRecordingSession(frameRate: Int32, initialLayoutSnapshot: RecordingLayoutSnapshot) -> Bool {
+        guard recordingState == .idle else { return false }
+        self.frameRate = normalizedFrameRate(frameRate)
+        self.frameDuration = CMTime(value: 1, timescale: self.frameRate)
+        recordingState = .preparing
+
+        do {
+            try setupAssetWriter()
+            prewarmCompositor()
+            nativeMovieRecordingStartedAt = Date()
+            nativeMovieLayoutTimeline = [WorkLayoutTimelineEntry(time: .zero, snapshot: initialLayoutSnapshot)]
+            recordingState = .recording
+            isRecording = true
+            isNativeMovieRecordingActive = true
+            startTime = nil
+            lastFrameTime = nil
+            nextVideoFrameTime = nil
+            recordingDuration = 0
+            recordedDurationString = "00:00"
+            startDurationTimer()
+            return true
+        } catch {
+            errorMessage = L10n.string("error.recording.initializationFailed", error.localizedDescription)
+            resetRecordingState()
+            return false
+        }
+    }
+
+    @MainActor
+    func updateNativeMovieRecordingLayout(_ snapshot: RecordingLayoutSnapshot) {
+        guard isNativeMovieRecordingActive,
+              let nativeMovieRecordingStartedAt else { return }
+        let elapsed = Date().timeIntervalSince(nativeMovieRecordingStartedAt)
+        nativeMovieLayoutTimeline.append(
+            WorkLayoutTimelineEntry(
+                time: CMTime(seconds: max(0, elapsed), preferredTimescale: 600),
+                snapshot: snapshot
+            )
+        )
+    }
+
+    @MainActor
+    func finishNativeMovieRecording(
+        frontURL: URL,
+        backURL: URL?,
+        layoutSnapshot: RecordingLayoutSnapshot,
+        saveToSystemPhotos: Bool = false
+    ) async {
+        guard recordingState == .recording, isNativeMovieRecordingActive else { return }
+        recordingState = .stopping
+        isRecording = false
+        isNativeMovieRecordingActive = false
+
+        processingQueue.sync {}
+        mediaWritingQueue.sync {}
+
+        let layoutTimeline = nativeMovieLayoutTimeline.isEmpty
+            ? [WorkLayoutTimelineEntry(time: .zero, snapshot: layoutSnapshot)]
+            : nativeMovieLayoutTimeline
+        let completedDuration = recordingDuration
+
+        guard startTime != nil else {
+            errorMessage = L10n.string("error.album.noRecordedVideo")
+            resetRecordingState()
+            return
+        }
+
+        guard assetWriter?.status == .writing else {
+            errorMessage = L10n.string("error.video.writeFailed", assetWriter?.error?.localizedDescription ?? L10n.string("error.recorder.invalidState"))
+            resetRecordingState()
+            return
+        }
+
+        markInputsAsFinished()
+
+        guard await finishWriting() else {
+            resetRecordingState()
+            return
+        }
+
+        recordingState = .saving
+
+        do {
+            guard let completedURL = outputURL,
+                  FileManager.default.fileExists(atPath: completedURL.path) else {
+                throw NSError(domain: "DualCamApp", code: -61, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.album.recordingFileMissing")])
+            }
+
+            let frontOriginalURL = try persistNativeOriginalMovie(from: frontURL, cameraName: "front")
+            let backOriginalURL = try backURL.map { try persistNativeOriginalMovie(from: $0, cameraName: "back") }
+
+            workCompletedHandler?(
+                RecordedWorkDraft(
+                    kind: .video,
+                    assetURL: completedURL,
+                    pairedVideoURL: nil,
+                    frontOriginalURL: frontOriginalURL,
+                    backOriginalURL: backOriginalURL,
+                    highQualityRenderStatus: .notStarted,
+                    layoutTimeline: layoutTimeline,
+                    createdAt: Date(),
+                    duration: completedDuration,
+                    layout: latestLayoutIdentifier,
+                    resolution: layoutSnapshot.outputSize,
+                    frameRate: Int(frameRate),
+                    isLivePhoto: false
+                )
+            )
+
+            if saveToSystemPhotos {
+                await saveToPhotoLibrary()
+            }
+        } catch {
+            errorMessage = L10n.string("error.video.writeFailed", error.localizedDescription)
+        }
+
+        resetRecordingState()
+    }
+
+    @MainActor
+    func cancelNativeMovieRecordingSession(error: Error) {
+        guard isNativeMovieRecordingActive else { return }
+        errorMessage = L10n.string("error.video.writeFailed", error.localizedDescription)
+        resetRecordingState()
+    }
+
     /// 开始录制
     @MainActor
     func startRecording(frameRate: Int32) async {
@@ -494,6 +632,81 @@ class VideoRecorder: ObservableObject {
     }
 
     @MainActor
+    func captureNativePhoto(
+        frontData: Data,
+        backData: Data?,
+        layoutSnapshot: RecordingLayoutSnapshot,
+        saveToSystemPhotos: Bool = false
+    ) async {
+        guard recordingState == .idle else { return }
+        recordingState = .saving
+
+        do {
+            let photoURL = try await makeNativePhotoFile(frontData: frontData, backData: backData, layoutSnapshot: layoutSnapshot)
+            workCompletedHandler?(
+                RecordedWorkDraft(
+                    kind: .photo,
+                    assetURL: photoURL,
+                    pairedVideoURL: nil,
+                    createdAt: Date(),
+                    duration: nil,
+                    layout: latestLayoutIdentifier,
+                    resolution: layoutSnapshot.outputSize,
+                    frameRate: Int(frameRate),
+                    isLivePhoto: false
+                )
+            )
+            if saveToSystemPhotos {
+                await savePhotoToPhotoLibrary(photoURL)
+            }
+        } catch {
+            errorMessage = L10n.string("error.photo.saveFailed", error.localizedDescription)
+        }
+
+        resetRecordingState()
+    }
+
+    @MainActor
+    func captureNativeLivePhoto(
+        front: NativeLivePhotoCapture,
+        back: NativeLivePhotoCapture?,
+        layoutSnapshot: RecordingLayoutSnapshot,
+        saveToSystemPhotos: Bool = false
+    ) async {
+        guard recordingState == .idle else { return }
+        recordingState = .saving
+
+        defer {
+            try? FileManager.default.removeItem(at: front.movieURL)
+            if let back { try? FileManager.default.removeItem(at: back.movieURL) }
+        }
+
+        do {
+            let capture = try await makeNativeLivePhotoFiles(front: front, back: back, layoutSnapshot: layoutSnapshot)
+            workCompletedHandler?(
+                RecordedWorkDraft(
+                    kind: .photo,
+                    assetURL: capture.photoURL,
+                    pairedVideoURL: capture.movieURL,
+                    createdAt: Date(),
+                    duration: nil,
+                    layout: latestLayoutIdentifier,
+                    resolution: layoutSnapshot.outputSize,
+                    frameRate: Int(frameRate),
+                    isLivePhoto: true
+                )
+            )
+            if saveToSystemPhotos {
+                await saveLivePhotoToPhotoLibrary(photoURL: capture.photoURL, pairedVideoURL: capture.movieURL)
+            }
+        } catch {
+            errorMessage = L10n.string("error.livePhoto.saveFailed", error.localizedDescription)
+        }
+
+        resetRecordingState()
+    }
+
+    @MainActor
     func capturePhoto(livePhotoEnabled: Bool, livePhotoDuration: TimeInterval = 2.5, saveToSystemPhotos: Bool = false) async {
         guard recordingState == .idle else { return }
 
@@ -514,7 +727,7 @@ class VideoRecorder: ObservableObject {
                     createdAt: Date(),
                     duration: nil,
                     layout: latestLayoutIdentifier,
-                    resolution: videoSize,
+                    resolution: photoSize,
                     frameRate: Int(frameRate),
                     isLivePhoto: false
                 )
@@ -546,7 +759,7 @@ class VideoRecorder: ObservableObject {
                     createdAt: Date(),
                     duration: captureDuration,
                     layout: latestLayoutIdentifier,
-                    resolution: videoSize,
+                    resolution: photoSize,
                     frameRate: Int(frameRate),
                     isLivePhoto: true
                 )
@@ -560,6 +773,86 @@ class VideoRecorder: ObservableObject {
         }
 
         resetRecordingState()
+    }
+
+    private func makeNativePhotoFile(frontData: Data, backData: Data?, layoutSnapshot: RecordingLayoutSnapshot) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            processingQueue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(throwing: NSError(domain: "DualCamApp", code: -20, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.generatorReleased")]))
+                    return
+                }
+
+                autoreleasepool {
+                    guard let frontImage = UIImage(data: frontData) else {
+                        continuation.resume(throwing: NSError(domain: "DualCamApp", code: -22, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.compositionFailed")]))
+                        return
+                    }
+                    let backImage = backData.flatMap { UIImage(data: $0) }
+
+                    guard let image = self.composeImages(front: frontImage, back: backImage, layoutSnapshot: layoutSnapshot),
+                          let imageData = image.jpegData(compressionQuality: 0.92) else {
+                        continuation.resume(throwing: NSError(domain: "DualCamApp", code: -22, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.compositionFailed")]))
+                        return
+                    }
+
+                    do {
+                        let photoURL = self.makePhotoOutputURL()
+                        try imageData.write(to: photoURL, options: .atomic)
+                        continuation.resume(returning: photoURL)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        }
+    }
+
+    private func makeNativeLivePhotoFiles(front: NativeLivePhotoCapture, back: NativeLivePhotoCapture?, layoutSnapshot: RecordingLayoutSnapshot) async throws -> (photoURL: URL, movieURL: URL) {
+        try await withCheckedThrowingContinuation { continuation in
+            processingQueue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(throwing: NSError(domain: "DualCamApp", code: -40, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.generatorReleased")]))
+                    return
+                }
+
+                autoreleasepool {
+                    guard let frontImage = UIImage(data: front.photoData) else {
+                        continuation.resume(throwing: NSError(domain: "DualCamApp", code: -42, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillCompositionFailed")]))
+                        return
+                    }
+                    let backImage = back.flatMap { UIImage(data: $0.photoData) }
+                    guard let image = self.composeImages(front: frontImage, back: backImage, layoutSnapshot: layoutSnapshot) else {
+                        continuation.resume(throwing: NSError(domain: "DualCamApp", code: -42, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.stillCompositionFailed")]))
+                        return
+                    }
+
+                    let assetIdentifier = UUID().uuidString
+                    let photoURL = self.makeLivePhotoStillOutputURL()
+                    let movieURL = self.makeLivePhotoMovieOutputURL()
+                    let backMovieURL = back?.movieURL
+                    let stillImageTime = front.photoDisplayTime.isValid && front.photoDisplayTime.isNumeric ? front.photoDisplayTime : .zero
+
+                    self.mediaWritingQueue.async { [weak self] in
+                        guard let self else { return }
+                        do {
+                            try LivePhotoRecorder.writeStillImage(image, to: photoURL, assetIdentifier: assetIdentifier)
+                            try self.composeNativeLivePhotoMovieFile(
+                                frontURL: front.movieURL,
+                                backURL: backMovieURL,
+                                outputURL: movieURL,
+                                layoutSnapshot: layoutSnapshot,
+                                assetIdentifier: assetIdentifier,
+                                stillImageTime: stillImageTime
+                            )
+                            continuation.resume(returning: (photoURL: photoURL, movieURL: movieURL))
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func makeCurrentPhotoFile() async throws -> URL {
@@ -662,9 +955,13 @@ class VideoRecorder: ObservableObject {
                             }
 
                             try LivePhotoRecorder.writeStillImage(image, to: photoURL, assetIdentifier: assetIdentifier)
+                            let livePhotoSize = CGSize(
+                                width: CVPixelBufferGetWidth(stillFrame.pixelBuffer),
+                                height: CVPixelBufferGetHeight(stillFrame.pixelBuffer)
+                            )
                             let recorder = try LivePhotoRecorder(
                                 movieURL: movieURL,
-                                videoSize: self.videoSize,
+                                videoSize: livePhotoSize,
                                 assetIdentifier: assetIdentifier,
                                 stillImageTime: stillImageTime
                             )
@@ -856,6 +1153,378 @@ class VideoRecorder: ObservableObject {
     }
     
     /// 合成并写入帧
+    private func composeNativeMovieFile(
+        frontURL: URL,
+        backURL: URL?,
+        layoutTimeline: [WorkLayoutTimelineEntry],
+        control: HighQualityRenderControl? = nil,
+        progress: (@Sendable (Double, String) -> Void)? = nil
+    ) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            mediaWritingQueue.async { [weak self] in
+                var outputURLToRemove: URL?
+                var activeFrontReader: AVAssetReader?
+                var activeBackReader: AVAssetReader?
+                var activeWriter: AVAssetWriter?
+                guard let self else {
+                    continuation.resume(throwing: NSError(domain: "DualCamApp", code: -50, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.recorder.initializationFailed")]))
+                    return
+                }
+
+                do {
+                    let outputURL = self.makeOutputURL()
+                    outputURLToRemove = outputURL
+                    progress?(0.01, L10n.string("works.highQuality.phase.preparing"))
+                    try control?.waitIfNeeded()
+                    if FileManager.default.fileExists(atPath: outputURL.path) {
+                        try FileManager.default.removeItem(at: outputURL)
+                    }
+
+                    let normalizedLayoutTimeline = layoutTimeline.sorted { $0.time < $1.time }
+                    let initialLayoutSnapshot = normalizedLayoutTimeline.first?.snapshot
+                    guard let initialLayoutSnapshot else {
+                        throw NSError(domain: "DualCamApp", code: -50, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.recorder.initializationFailed")])
+                    }
+
+                    let frontAsset = AVAsset(url: frontURL)
+                    guard let frontVideoTrack = frontAsset.tracks(withMediaType: .video).first else {
+                        throw NSError(domain: "DualCamApp", code: -51, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.album.noRecordedVideo")])
+                    }
+
+                    let frontReader = try AVAssetReader(asset: frontAsset)
+                    activeFrontReader = frontReader
+                    let frontVideoOutput = self.makeOrientedVideoReaderOutput(asset: frontAsset, track: frontVideoTrack)
+                    guard frontReader.canAdd(frontVideoOutput) else {
+                        throw NSError(domain: "DualCamApp", code: -52, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.cannotAddInput")])
+                    }
+                    frontReader.add(frontVideoOutput)
+
+                    var backAsset: AVAsset?
+                    var backReader: AVAssetReader?
+                    var backVideoOutput: AVAssetReaderVideoCompositionOutput?
+                    if let backURL {
+                        let asset = AVAsset(url: backURL)
+                        backAsset = asset
+                        if let backVideoTrack = asset.tracks(withMediaType: .video).first {
+                            let reader = try AVAssetReader(asset: asset)
+                            activeBackReader = reader
+                            let output = self.makeOrientedVideoReaderOutput(asset: asset, track: backVideoTrack)
+                            if reader.canAdd(output) {
+                                reader.add(output)
+                                backReader = reader
+                                backVideoOutput = output
+                            }
+                        }
+                    }
+
+                    let writer = try AVAssetWriter(url: outputURL, fileType: .mp4)
+                    activeWriter = writer
+                    let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
+                        AVVideoCodecKey: AVVideoCodecType.h264,
+                        AVVideoWidthKey: initialLayoutSnapshot.outputSize.width,
+                        AVVideoHeightKey: initialLayoutSnapshot.outputSize.height,
+                        AVVideoCompressionPropertiesKey: [
+                            AVVideoAverageBitRateKey: self.videoBitRate(for: self.frameRate),
+                            AVVideoExpectedSourceFrameRateKey: Int(self.frameRate),
+                            AVVideoMaxKeyFrameIntervalKey: Int(self.frameRate),
+                            AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
+                        ]
+                    ])
+                    videoInput.expectsMediaDataInRealTime = false
+                    guard writer.canAdd(videoInput) else {
+                        throw NSError(domain: "DualCamApp", code: -53, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.cannotAddInput")])
+                    }
+                    writer.add(videoInput)
+
+                    let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput, sourcePixelBufferAttributes: [
+                        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                        kCVPixelBufferWidthKey as String: initialLayoutSnapshot.outputSize.width,
+                        kCVPixelBufferHeightKey as String: initialLayoutSnapshot.outputSize.height,
+                        kCVPixelBufferCGImageCompatibilityKey as String: true,
+                        kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+                        kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+                    ])
+
+                    let audioSourceAsset = [backAsset, frontAsset].compactMap { $0 }.first { !$0.tracks(withMediaType: .audio).isEmpty }
+                    let audioSourceTrack = audioSourceAsset?.tracks(withMediaType: .audio).first
+                    var audioInput: AVAssetWriterInput?
+                    if audioSourceTrack != nil {
+                        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: CaptureAudioSettings.aac)
+                        input.expectsMediaDataInRealTime = false
+                        if writer.canAdd(input) {
+                            writer.add(input)
+                            audioInput = input
+                        }
+                    }
+
+                    guard frontReader.startReading() else {
+                        throw frontReader.error ?? NSError(domain: "DualCamApp", code: -54, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.writeFailed", "Front reader failed")])
+                    }
+                    _ = backReader?.startReading()
+                    guard writer.startWriting() else {
+                        throw writer.error ?? NSError(domain: "DualCamApp", code: -55, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.cannotStartWriting")])
+                    }
+                    writer.startSession(atSourceTime: .zero)
+
+                    var firstVideoTime: CMTime?
+                    var lastBackBuffer: CVPixelBuffer?
+                    var nextBackSample = backVideoOutput?.copyNextSampleBuffer()
+                    let totalVideoSeconds = max(CMTimeGetSeconds(frontAsset.duration), 0.001)
+                    var lastProgressReport = Date.distantPast
+                    var lastProgressValue = 0.0
+
+                    while let frontSample = frontVideoOutput.copyNextSampleBuffer() {
+                        try control?.waitIfNeeded()
+                        guard let frontBuffer = CMSampleBufferGetImageBuffer(frontSample) else { continue }
+                        let frontTime = CMSampleBufferGetPresentationTimeStamp(frontSample)
+                        if firstVideoTime == nil { firstVideoTime = frontTime }
+                        let timelineOrigin = firstVideoTime ?? .zero
+                        let outputTime = frontTime - timelineOrigin
+
+                        while let backSample = nextBackSample {
+                            let backTime = CMSampleBufferGetPresentationTimeStamp(backSample)
+                            guard backTime <= frontTime else { break }
+                            lastBackBuffer = CMSampleBufferGetImageBuffer(backSample)
+                            nextBackSample = backVideoOutput?.copyNextSampleBuffer()
+                        }
+
+                        let layoutSnapshot = self.layoutSnapshot(at: outputTime, in: normalizedLayoutTimeline)
+                        guard let pixelBuffer = self.renderCompositePixelBuffer(frontBuffer: frontBuffer, backBuffer: lastBackBuffer, layoutSnapshot: layoutSnapshot) else { continue }
+                        while !videoInput.isReadyForMoreMediaData {
+                            try control?.waitIfNeeded()
+                            Thread.sleep(forTimeInterval: 0.002)
+                        }
+                        guard adaptor.append(pixelBuffer, withPresentationTime: outputTime) else {
+                            throw writer.error ?? NSError(domain: "DualCamApp", code: -56, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.writeFailed", "Video append failed")])
+                        }
+
+                        let currentProgress = min(max(CMTimeGetSeconds(outputTime) / totalVideoSeconds, 0), 1) * 0.92
+                        if currentProgress - lastProgressValue >= 0.005 || Date().timeIntervalSince(lastProgressReport) >= 0.25 {
+                            lastProgressValue = currentProgress
+                            lastProgressReport = Date()
+                            progress?(currentProgress, L10n.string("works.highQuality.phase.rendering"))
+                        }
+                    }
+
+                    videoInput.markAsFinished()
+                    guard frontReader.status == .completed || frontReader.status == .reading else {
+                        throw frontReader.error ?? NSError(domain: "DualCamApp", code: -57, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.writeFailed", "Front reader incomplete")])
+                    }
+
+                    progress?(0.92, L10n.string("works.highQuality.phase.audio"))
+                    if let audioSourceAsset, let audioSourceTrack, let audioInput {
+                        try self.appendAudioTrack(from: audioSourceAsset, track: audioSourceTrack, to: audioInput, control: control)
+                    }
+
+                    try control?.waitIfNeeded()
+                    progress?(0.98, L10n.string("works.highQuality.phase.finishing"))
+                    let semaphore = DispatchSemaphore(value: 0)
+                    writer.finishWriting { semaphore.signal() }
+                    semaphore.wait()
+                    guard writer.status == .completed else {
+                        throw writer.error ?? NSError(domain: "DualCamApp", code: -58, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.writeFailed", String(describing: writer.status))])
+                    }
+
+                    outputURLToRemove = nil
+                    progress?(1, L10n.string("works.highQuality.phase.completed"))
+                    continuation.resume(returning: outputURL)
+                } catch is CancellationError {
+                    activeFrontReader?.cancelReading()
+                    activeBackReader?.cancelReading()
+                    activeWriter?.cancelWriting()
+                    if let outputURLToRemove {
+                        try? FileManager.default.removeItem(at: outputURLToRemove)
+                    }
+                    continuation.resume(throwing: CancellationError())
+                } catch {
+                    if let outputURLToRemove {
+                        try? FileManager.default.removeItem(at: outputURLToRemove)
+                    }
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func renderHighQualityVideo(
+        frontURL: URL,
+        backURL: URL?,
+        layoutTimeline: [WorkLayoutTimelineEntry],
+        frameRate: Int,
+        control: HighQualityRenderControl,
+        progress: @escaping @Sendable (Double, String) -> Void
+    ) async throws -> URL {
+        let normalizedTimeline = layoutTimeline.sorted { $0.time < $1.time }
+        guard !normalizedTimeline.isEmpty else {
+            throw NSError(domain: "DualCamApp", code: -62, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.works.highQualityMissingTimeline")])
+        }
+        self.frameRate = normalizedFrameRate(Int32(frameRate))
+        self.frameDuration = CMTime(value: 1, timescale: self.frameRate)
+        return try await composeNativeMovieFile(frontURL: frontURL, backURL: backURL, layoutTimeline: normalizedTimeline, control: control, progress: progress)
+    }
+
+    private func composeNativeLivePhotoMovieFile(
+        frontURL: URL,
+        backURL: URL?,
+        outputURL: URL,
+        layoutSnapshot: RecordingLayoutSnapshot,
+        assetIdentifier: String,
+        stillImageTime: CMTime
+    ) throws {
+        let frontAsset = AVAsset(url: frontURL)
+        guard let frontVideoTrack = frontAsset.tracks(withMediaType: .video).first else {
+            throw NSError(domain: "DualCamApp", code: -51, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.album.noRecordedVideo")])
+        }
+
+        let frontReader = try AVAssetReader(asset: frontAsset)
+        let frontVideoOutput = makeOrientedVideoReaderOutput(asset: frontAsset, track: frontVideoTrack)
+        guard frontReader.canAdd(frontVideoOutput) else {
+            throw NSError(domain: "DualCamApp", code: -52, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.cannotAddInput")])
+        }
+        frontReader.add(frontVideoOutput)
+
+        var backAsset: AVAsset?
+        var backReader: AVAssetReader?
+        var backVideoOutput: AVAssetReaderVideoCompositionOutput?
+        if let backURL {
+            let asset = AVAsset(url: backURL)
+            backAsset = asset
+            if let backVideoTrack = asset.tracks(withMediaType: .video).first {
+                let reader = try AVAssetReader(asset: asset)
+                let output = makeOrientedVideoReaderOutput(asset: asset, track: backVideoTrack)
+                if reader.canAdd(output) {
+                    reader.add(output)
+                    backReader = reader
+                    backVideoOutput = output
+                }
+            }
+        }
+
+        guard frontReader.startReading() else {
+            throw frontReader.error ?? NSError(domain: "DualCamApp", code: -54, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.writeFailed", "Front reader failed")])
+        }
+        _ = backReader?.startReading()
+
+        guard let firstFrontSample = frontVideoOutput.copyNextSampleBuffer() else {
+            throw NSError(domain: "DualCamApp", code: -31, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.livePhoto.noMotionFrames")])
+        }
+
+        let firstVideoTime = CMSampleBufferGetPresentationTimeStamp(firstFrontSample)
+        let normalizedStillTime = stillImageTime.isValid && stillImageTime.isNumeric && stillImageTime >= firstVideoTime ? stillImageTime - firstVideoTime : stillImageTime
+        let recorder = try LivePhotoRecorder(
+            movieURL: outputURL,
+            videoSize: layoutSnapshot.outputSize,
+            assetIdentifier: assetIdentifier,
+            stillImageTime: normalizedStillTime.isValid && normalizedStillTime.isNumeric ? normalizedStillTime : .zero
+        )
+
+        var lastBackBuffer: CVPixelBuffer?
+        var nextBackSample = backVideoOutput?.copyNextSampleBuffer()
+        var frontSample: CMSampleBuffer? = firstFrontSample
+        while let currentFrontSample = frontSample {
+            guard let frontBuffer = CMSampleBufferGetImageBuffer(currentFrontSample) else {
+                frontSample = frontVideoOutput.copyNextSampleBuffer()
+                continue
+            }
+
+            let frontTime = CMSampleBufferGetPresentationTimeStamp(currentFrontSample)
+            while let backSample = nextBackSample {
+                let backTime = CMSampleBufferGetPresentationTimeStamp(backSample)
+                guard backTime <= frontTime else { break }
+                lastBackBuffer = CMSampleBufferGetImageBuffer(backSample)
+                nextBackSample = backVideoOutput?.copyNextSampleBuffer()
+            }
+
+            if let pixelBuffer = renderCompositePixelBuffer(frontBuffer: frontBuffer, backBuffer: lastBackBuffer, layoutSnapshot: layoutSnapshot) {
+                recorder.appendVideoFrame(pixelBuffer, presentationTime: frontTime - firstVideoTime)
+            }
+            frontSample = frontVideoOutput.copyNextSampleBuffer()
+        }
+
+        let audioSourceAsset = [backAsset, frontAsset].compactMap { $0 }.first { !$0.tracks(withMediaType: .audio).isEmpty }
+        if let audioSourceAsset,
+           let audioTrack = audioSourceAsset.tracks(withMediaType: .audio).first {
+            try appendAudioTrack(from: audioSourceAsset, track: audioTrack, to: recorder, timelineOrigin: firstVideoTime)
+        }
+
+        try recorder.finishSynchronously()
+    }
+
+    private func makeOrientedVideoReaderOutput(asset: AVAsset, track: AVAssetTrack) -> AVAssetReaderVideoCompositionOutput {
+        let output = AVAssetReaderVideoCompositionOutput(
+            videoTracks: [track],
+            videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        )
+        let renderRect = CGRect(origin: .zero, size: track.naturalSize).applying(track.preferredTransform)
+        let renderSize = CGSize(width: abs(renderRect.width), height: abs(renderRect.height))
+        let composition = AVMutableVideoComposition()
+        composition.renderSize = CGSize(width: max(1, renderSize.width.rounded()), height: max(1, renderSize.height.rounded()))
+        composition.frameDuration = CMTime(value: 1, timescale: frameRate)
+
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = CMTimeRange(start: .zero, duration: asset.duration)
+        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
+        var transform = track.preferredTransform
+        transform.tx -= renderRect.minX
+        transform.ty -= renderRect.minY
+        layerInstruction.setTransform(transform, at: .zero)
+        instruction.layerInstructions = [layerInstruction]
+        composition.instructions = [instruction]
+        output.videoComposition = composition
+        return output
+    }
+
+    private func layoutSnapshot(at time: CMTime, in timeline: [WorkLayoutTimelineEntry]) -> RecordingLayoutSnapshot {
+        var selected = timeline[0].snapshot
+        for item in timeline where item.time <= time {
+            selected = item.snapshot
+        }
+        return selected
+    }
+
+    private func appendAudioTrack(from asset: AVAsset, track: AVAssetTrack, to recorder: LivePhotoRecorder, timelineOrigin: CMTime) throws {
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+        guard reader.canAdd(output) else { return }
+        reader.add(output)
+        guard reader.startReading() else {
+            throw reader.error ?? NSError(domain: "DualCamApp", code: -59, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.writeFailed", "Audio reader failed")])
+        }
+
+        while let sample = output.copyNextSampleBuffer() {
+            guard let retimedSample = Self.retimedAudioSampleBuffer(sample, timelineOrigin: timelineOrigin) else { continue }
+            recorder.appendAudioSampleBuffer(retimedSample)
+        }
+    }
+
+    private func appendAudioTrack(from asset: AVAsset, track: AVAssetTrack, to audioInput: AVAssetWriterInput, control: HighQualityRenderControl? = nil) throws {
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+        guard reader.canAdd(output) else { return }
+        reader.add(output)
+        guard reader.startReading() else {
+            throw reader.error ?? NSError(domain: "DualCamApp", code: -59, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.writeFailed", "Audio reader failed")])
+        }
+
+        var timelineOrigin: CMTime?
+        while let sample = output.copyNextSampleBuffer() {
+            try control?.waitIfNeeded()
+            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sample)
+            if timelineOrigin == nil { timelineOrigin = presentationTime }
+            guard let origin = timelineOrigin,
+                  let retimedSample = Self.retimedAudioSampleBuffer(sample, timelineOrigin: origin) else { continue }
+            while !audioInput.isReadyForMoreMediaData {
+                try control?.waitIfNeeded()
+                Thread.sleep(forTimeInterval: 0.002)
+            }
+            guard audioInput.append(retimedSample) else {
+                throw NSError(domain: "DualCamApp", code: -60, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.video.writeFailed", "Audio append failed")])
+            }
+        }
+        audioInput.markAsFinished()
+    }
+
+    /// 合成并写入帧
     private func composeAndWriteFrame(
         frontBuffer: CVPixelBuffer,
         backBuffer: CVPixelBuffer?,
@@ -1033,7 +1702,10 @@ class VideoRecorder: ObservableObject {
     ) -> UIImage? {
         guard let front = displayImage(from: frontBuffer) else { return nil }
         let back = backBuffer.flatMap { displayImage(from: $0) }
+        return composeImages(front: front, back: back, layoutSnapshot: layoutSnapshot)
+    }
 
+    private func composeImages(front: UIImage, back: UIImage?, layoutSnapshot: RecordingLayoutSnapshot) -> UIImage? {
         UIGraphicsBeginImageContextWithOptions(layoutSnapshot.outputSize, false, 1.0)
         defer { UIGraphicsEndImageContext() }
 
@@ -1319,7 +1991,7 @@ class VideoRecorder: ObservableObject {
     /// 启动时长计时器
     private func startDurationTimer() {
         Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
-            guard let self = self, self.isRecording else {
+            guard let self = self, self.isRecording || self.isNativeMovieRecordingActive else {
                 timer.invalidate()
                 return
             }
@@ -1334,6 +2006,10 @@ class VideoRecorder: ObservableObject {
     @MainActor
     private func resetRecordingState() {
         recordingState = .idle
+        isRecording = false
+        isNativeMovieRecordingActive = false
+        nativeMovieRecordingStartedAt = nil
+        nativeMovieLayoutTimeline = []
         recordingDuration = 0
         recordedDurationString = "00:00"
     }
@@ -1342,6 +2018,16 @@ class VideoRecorder: ObservableObject {
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let fileName = "dual_camera_\(UUID().uuidString).mp4"
         return documentsPath.appendingPathComponent(fileName)
+    }
+
+    private func persistNativeOriginalMovie(from temporaryURL: URL, cameraName: String) throws -> URL {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let destinationURL = documentsPath.appendingPathComponent("dual_camera_original_\(cameraName)_\(UUID().uuidString).mov")
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try FileManager.default.removeItem(at: destinationURL)
+        }
+        try FileManager.default.moveItem(at: temporaryURL, to: destinationURL)
+        return destinationURL
     }
 
     private func makePhotoOutputURL() -> URL {

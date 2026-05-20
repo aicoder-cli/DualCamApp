@@ -199,6 +199,15 @@
 "works.delete.confirm.title" = "删除所选作品？";
 "works.delete.confirm.message" = "将从本机永久删除所选的 %d 个作品。";
 "works.delete.success" = "已删除 %d 个作品。";
+"works.highQuality.ready" = "高清合成视频已生成。";
+"works.highQuality.phase.preparing" = "正在准备高清合成…";
+"works.highQuality.phase.rendering" = "正在生成高清视频…";
+"works.highQuality.phase.audio" = "正在处理音频…";
+"works.highQuality.phase.finishing" = "正在完成视频…";
+"works.highQuality.phase.completed" = "高清合成视频已生成。";
+"works.highQuality.phase.paused" = "高清生成已暂停。";
+"works.highQuality.phase.failed" = "高清生成失败。";
+"works.highQuality.phase.cancelled" = "高清生成已取消。";
 
 "workDetail.title" = "预览";
 "workDetail.back.works" = "作品";
@@ -208,6 +217,15 @@
 "workDetail.share" = "分享";
 "workDetail.edit" = "编辑";
 "workDetail.save" = "保存";
+"workDetail.highQuality.generate" = "高清";
+"workDetail.highQuality.rendering" = "生成中";
+"workDetail.highQuality.pause" = "暂停";
+"workDetail.highQuality.resume" = "继续";
+"workDetail.highQuality.cancel" = "取消";
+"workDetail.highQuality.ready" = "高清已就绪";
+"workDetail.highQuality.readyMessage" = "目前已经是合成的高清视频，可以直接保存到系统相册了。";
+"workDetail.highQuality.retry" = "重试高清";
+"workDetail.highQuality.unavailable" = "高清";
 
 "error.works.readFailed" = "无法读取 DualCam 作品：%@";
 "error.works.saveFailed" = "无法保存此作品：%@";
@@ -215,6 +233,9 @@
 "error.works.photoLibraryDenied" = "请在设置中允许添加作品到相册。";
 "error.works.exportFailed" = "保存到相册失败：%@";
 "error.works.deleteFailed" = "无法删除作品：%@";
+"error.works.highQualityFailed" = "无法生成高清合成视频：%@";
+"error.works.highQualityMissingOriginals" = "前后摄原始录制文件不存在。";
+"error.works.highQualityMissingTimeline" = "这个作品缺少用于高清合成的布局时间线。";
 
 "settings.ok" = "好的";
 "settings.section.shootingDefaults" = "拍摄默认值";
@@ -240,16 +261,33 @@
 "settings.rememberLastLayout.title" = "记住上次布局";
 "settings.rememberLastLayout.subtitle" = "再次进入相机时恢复上次使用的模板。";
 
+"settings.mediaOutput.title" = "媒体输出";
+"settings.mediaOutput.subtitle" = "照片比例、视频清晰度与当前生效规格。";
+"settings.mediaOutput.effective" = "当前生效";
+"settings.mediaOutput.format" = "格式";
+"settings.mediaOutput.format.compatible" = "JPEG + MP4/H.264";
+"settings.mediaOutput.liveCanvas" = "Live Photo 画布";
+"settings.mediaOutput.liveCanvas.followPhoto" = "跟随照片";
+"settings.mediaOutput.fallback" = "原生输出状态";
+"settings.mediaOutput.fallback.pending" = "正在检查原生输出支持。";
+"settings.mediaOutput.fallback.ready" = "原生优先，失败时自动回退。";
+"settings.mediaOutput.fallback.usingFallback" = "原生双路照片/视频输出不可完整使用，正在使用兼容合成管线。";
+"settings.photoAspectRatio.title" = "照片比例";
+"settings.photoAspectRatio.subtitle" = "普通照片与 Live Photo 的默认画布。";
+"settings.photoAspectRatio.3x4" = "3:4";
+"settings.photoAspectRatio.9x16" = "9:16";
+"settings.photoAspectRatio.3x4.description" = "接近 iPhone 原生照片观感，输出 1080×1440。";
+"settings.photoAspectRatio.9x16.description" = "竖屏社交比例，输出 1080×1920。";
 "settings.videoResolution.title" = "视频分辨率";
-"settings.videoResolution.subtitle" = "本阶段先保存偏好；当前录制器输出仍保持 720p。";
+"settings.videoResolution.subtitle" = "控制 DualCam 合成视频的输出画布。";
 "settings.videoResolution.720p" = "720p";
 "settings.videoResolution.1080p" = "1080p";
-"settings.videoResolution.720p.description" = "当前稳定的录制输出。";
-"settings.videoResolution.1080p.description" = "为后续录制器升级预留并保存偏好。";
+"settings.videoResolution.720p.description" = "较低负载的备用输出。";
+"settings.videoResolution.1080p.description" = "默认高清输出，1080×1920。";
 "settings.frameRate.title" = "视频帧率";
 "settings.frameRate.subtitle" = "录制器空闲时应用，或在下次开始录制前应用。";
 "settings.videoCodec.title" = "视频格式";
-"settings.videoCodec.subtitle" = "本阶段先保存偏好；当前写入器仍使用 H.264。";
+"settings.videoCodec.subtitle" = "第一轮保持兼容格式，原生输出失败会自动回退。";
 "settings.videoCodec.h264" = "H.264";
 "settings.videoCodec.hevc" = "HEVC";
 "settings.videoCodec.h264.description" = "兼容更多设备和应用。";

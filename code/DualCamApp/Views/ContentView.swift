@@ -53,6 +53,11 @@ enum ShootingFrameRate: Int, CaseIterable, Identifiable {
     }
 }
 
+private enum PendingCaptureRequest {
+    case video(frameRate: Int)
+    case photo(livePhotoEnabled: Bool, livePhotoDuration: Double)
+}
+
 struct ContentView: View {
 
     // MARK: - State Objects
@@ -73,16 +78,24 @@ struct ContentView: View {
     @State private var recordingControlsRevealed = false
     @State private var hasShownStartupMinimumDuration = false
     @State private var isRearFocalPickerPresented = false
+    @State private var countdownRemaining: Int?
+    @State private var countdownTask: Task<Void, Never>?
+    @State private var nativeMovieRecordingSnapshot: RecordingLayoutSnapshot?
+    @State private var previewSize: CGSize = .zero
     @State private var hideControlsWorkItem: DispatchWorkItem?
     @State private var hideRearFocalPickerWorkItem: DispatchWorkItem?
     @AppStorage(SettingsKey.defaultLivePhotoDuration) private var defaultLivePhotoDuration: Double = 2.5
     @AppStorage(SettingsKey.shootingFrameRate) private var shootingFrameRate: Int = 30
+    @AppStorage(SettingsKey.photoAspectRatio) private var photoAspectRatioRaw = PhotoAspectRatio.threeByFour.rawValue
+    @AppStorage(SettingsKey.videoResolution) private var videoResolutionRaw = VideoResolution.p1080.rawValue
+    @AppStorage(SettingsKey.videoCodec) private var videoCodecRaw = VideoCodec.h264.rawValue
     @AppStorage(SettingsKey.defaultCaptureMode) private var defaultCaptureModeRaw = DefaultCaptureMode.video.rawValue
     @AppStorage(SettingsKey.defaultLayout) private var defaultLayoutRaw = LayoutType.pictureInPicture.rawValue
     @AppStorage(SettingsKey.rememberLastLayout) private var rememberLastLayout = true
     @AppStorage(SettingsKey.lastLayout) private var lastLayoutRaw = LayoutType.pictureInPicture.rawValue
     @AppStorage(SettingsKey.immersiveRecording) private var immersiveRecording = true
     @AppStorage(SettingsKey.controlRevealSeconds) private var controlRevealSeconds = ControlRevealDuration.twoSeconds.rawValue
+    @AppStorage(SettingsKey.recordingCountdownSeconds) private var recordingCountdownSeconds = RecordingCountdown.off.rawValue
     @AppStorage(SettingsKey.soundAndHapticsEnabled) private var soundAndHapticsEnabled = true
     @AppStorage(SettingsKey.lastRearFocalLength) private var lastRearFocalLength: Double = 1.0
 
@@ -100,6 +113,31 @@ struct ContentView: View {
 
     private var shouldShowStartupLoading: Bool {
         cameraManager.errorMessage == nil && (!hasShownStartupMinimumDuration || (!cameraManager.didFinishStartupAttempt && !cameraManager.isSessionRunning))
+    }
+
+    private var isCountdownActive: Bool {
+        countdownRemaining != nil || countdownTask != nil
+    }
+
+    private var mediaOutputSpec: MediaOutputSpec {
+        MediaOutputSpec(
+            photoAspectRatio: PhotoAspectRatio.from(photoAspectRatioRaw),
+            videoResolution: VideoResolution.from(videoResolutionRaw),
+            frameRate: shootingFrameRate,
+            videoCodec: VideoCodec.from(videoCodecRaw)
+        )
+    }
+
+    private var activeOutputSize: CGSize {
+        captureMode == .photo ? videoRecorder.outputPhotoSize : videoRecorder.outputVideoSize
+    }
+
+    private var effectiveOutputBadgeText: String {
+        captureMode == .photo ? mediaOutputSpec.photoBadgeText : mediaOutputSpec.videoBadgeText
+    }
+
+    private var recordingSafeFrame: CGRect {
+        makeRecordingSafeFrame(in: previewSize, outputSize: activeOutputSize)
     }
 
     // MARK: - Body
@@ -143,38 +181,18 @@ struct ContentView: View {
                         captureMode: captureMode,
                         latestWork: worksManager.latestWork,
                         showsSideControls: showsRecordingChrome,
-                        onStartRecording: {
-                            if captureMode == .video {
-                                let frameRate = shootingFrameRate
-                                Task<Void, Never> {
-                                    await cameraManager.setPreferredFrameRate(Int32(frameRate))
-                                    updateRecordingLayoutSnapshot()
-                                    await videoRecorder.startRecording(frameRate: cameraManager.effectiveFrameRate)
-                                }
-                            } else {
-                                guard videoRecorder.recordingState == .idle else { return }
-                                let livePhotoEnabled = isLivePhotoEnabled
-                                let livePhotoDuration = min(max(defaultLivePhotoDuration, 1.0), 10.0)
-                                captureFeedback.perform(livePhotoEnabled ? .livePhotoShutterAccepted : .photoCaptured, enabled: soundAndHapticsEnabled)
-                                Task<Void, Never> {
-                                    updateRecordingLayoutSnapshot()
-                                    await videoRecorder.capturePhoto(
-                                        livePhotoEnabled: livePhotoEnabled,
-                                        livePhotoDuration: livePhotoDuration,
-                                        saveToSystemPhotos: false
-                                    )
-                                }
-                            }
-                        },
-                        onStopRecording: {
-                            Task<Void, Never> { await videoRecorder.stopRecording(saveToSystemPhotos: false) }
-                        },
+                        isCountingDown: isCountdownActive,
+                        onStartRecording: beginCaptureWithOptionalCountdown,
+                        onStopRecording: stopActiveRecording,
+                        onCancelCountdown: cancelCountdown,
                         onCustomize: {
+                            cancelCountdown()
                             withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
                                 showCustomizePanel = true
                             }
                         },
                         onOpenAlbum: {
+                            cancelCountdown()
                             showWorks = true
                         }
                     )
@@ -210,6 +228,13 @@ struct ContentView: View {
                         .transition(.opacity)
                 }
 
+                if let countdownRemaining {
+                    CaptureCountdownOverlay(remaining: countdownRemaining)
+                        .transition(.scale(scale: 0.86).combined(with: .opacity))
+                        .allowsHitTesting(false)
+                        .zIndex(4)
+                }
+
                 if showCustomizePanel {
                     CustomizationOverlay(
                         layoutManager: layoutManager,
@@ -218,12 +243,19 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .onAppear {
+                updatePreviewSize(geometry.size)
+            }
+            .onChange(of: geometry.size) { newSize in
+                updatePreviewSize(newSize)
+            }
         }
         .ignoresSafeArea()
         .onAppear {
             hasShownStartupMinimumDuration = false
             configureRecordingHandlers()
             applyInitialPreferencesIfNeeded()
+            applyMediaOutputSpec()
             updateRecordingLayoutSnapshot()
             updateLivePhotoPrebuffering()
             let frameRate = shootingFrameRate
@@ -240,7 +272,21 @@ struct ContentView: View {
         }
         .onChange(of: shootingFrameRate) { frameRate in
             guard videoRecorder.recordingState == .idle else { return }
+            applyMediaOutputSpec()
+            updateRecordingLayoutSnapshot()
             Task<Void, Never> { await cameraManager.setPreferredFrameRate(Int32(frameRate)) }
+        }
+        .onChange(of: photoAspectRatioRaw) { _ in
+            applyMediaOutputSpec()
+            updateRecordingLayoutSnapshot()
+            updateLivePhotoPrebuffering()
+        }
+        .onChange(of: videoResolutionRaw) { _ in
+            applyMediaOutputSpec()
+            updateRecordingLayoutSnapshot()
+        }
+        .onChange(of: videoCodecRaw) { _ in
+            applyMediaOutputSpec()
         }
         .onChange(of: cameraManager.rearZoomFactor) { zoomFactor in
             lastRearFocalLength = Double(zoomFactor)
@@ -251,6 +297,9 @@ struct ContentView: View {
             }
         }
         .onChange(of: videoRecorder.recordingState) { state in
+            if state != .idle {
+                cancelCountdown()
+            }
             if state == .recording {
                 captureFeedback.perform(.recordingStarted, enabled: soundAndHapticsEnabled)
                 if isImmersiveRecordingActive {
@@ -265,7 +314,9 @@ struct ContentView: View {
             captureFeedback.perform(.captureFailed, enabled: soundAndHapticsEnabled)
         }
         .onChange(of: captureMode) { _ in
+            cancelCountdown()
             resetRecordingControls()
+            updateRecordingLayoutSnapshot()
             updateLivePhotoPrebuffering()
         }
         .onChange(of: immersiveRecording) { enabled in
@@ -294,7 +345,17 @@ struct ContentView: View {
         .onChange(of: layoutManager.floatingSize) { _ in updateRecordingLayoutSnapshot() }
         .onChange(of: layoutManager.floatingShape) { _ in updateRecordingLayoutSnapshot() }
         .onChange(of: layoutManager.containerSize) { _ in updateRecordingLayoutSnapshot() }
+        .onChange(of: showSettings) { isPresented in
+            if isPresented { cancelCountdown() }
+        }
+        .onChange(of: showWorks) { isPresented in
+            if isPresented { cancelCountdown() }
+        }
+        .onChange(of: showCustomizePanel) { isPresented in
+            if isPresented { cancelCountdown() }
+        }
         .onDisappear {
+            cancelCountdown()
             resetRecordingControls()
             hideRearFocalPickerWorkItem?.cancel()
             hideRearFocalPickerWorkItem = nil
@@ -364,6 +425,7 @@ struct ContentView: View {
                 didFinishStartupAttempt: cameraManager.didFinishStartupAttempt
             )
             .frame(width: size.width, height: size.height)
+            .mask(OutputSafeFrameMask(frame: makeRecordingSafeFrame(in: size, outputSize: activeOutputSize)))
 
             if showsRecordingChrome {
                 VStack(alignment: .leading, spacing: 4) {
@@ -377,11 +439,22 @@ struct ContentView: View {
                     Text(layoutManager.currentLayout.titleKey)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.84))
+
+                    Text(effectiveOutputBadgeText)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white.opacity(0.78))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Color.black.opacity(0.38)))
+                        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 118)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
+
+            OutputSafeFrameOverlay(frame: makeRecordingSafeFrame(in: size, outputSize: activeOutputSize), isVisible: showsRecordingChrome)
+                .allowsHitTesting(false)
 
             if isImmersiveRecordingActive && !recordingControlsRevealed {
                 Text("recording.tapToRevealControls")
@@ -391,8 +464,7 @@ struct ContentView: View {
                     .padding(.vertical, 8)
                     .background(Capsule().fill(Color.black.opacity(0.42)))
                     .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 16)
+                    .position(x: size.width / 2, y: max(24, makeRecordingSafeFrame(in: size, outputSize: activeOutputSize).minY - 18))
                     .transition(.opacity)
             }
 
@@ -478,6 +550,145 @@ struct ContentView: View {
         )
     }
 
+    private func beginCaptureWithOptionalCountdown() {
+        guard videoRecorder.recordingState == .idle else { return }
+        guard !isCountdownActive else { return }
+
+        let request: PendingCaptureRequest
+        if captureMode == .video {
+            request = .video(frameRate: shootingFrameRate)
+        } else {
+            request = .photo(
+                livePhotoEnabled: isLivePhotoEnabled,
+                livePhotoDuration: min(max(defaultLivePhotoDuration, 1.0), 10.0)
+            )
+        }
+
+        let countdownSeconds = RecordingCountdown.from(recordingCountdownSeconds).rawValue
+        guard countdownSeconds > 0 else {
+            executeCapture(request)
+            return
+        }
+
+        startCountdownThenCapture(request, seconds: countdownSeconds)
+    }
+
+    private func startCountdownThenCapture(_ request: PendingCaptureRequest, seconds: Int) {
+        cancelCountdown()
+        countdownTask = Task { @MainActor in
+            for remaining in stride(from: seconds, through: 1, by: -1) {
+                guard !Task.isCancelled else { return }
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    countdownRemaining = remaining
+                }
+
+                do {
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                } catch {
+                    return
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.18)) {
+                countdownRemaining = nil
+            }
+            countdownTask = nil
+            executeCapture(request)
+        }
+    }
+
+    private func executeCapture(_ request: PendingCaptureRequest) {
+        guard videoRecorder.recordingState == .idle else { return }
+
+        switch request {
+        case .video(let frameRate):
+            Task<Void, Never> {
+                await cameraManager.setPreferredFrameRate(Int32(frameRate))
+                guard videoRecorder.recordingState == .idle else { return }
+                let snapshot = updateRecordingLayoutSnapshot()
+                if (try? cameraManager.startNativeMovieRecording()) != nil {
+                    if videoRecorder.startNativeMovieRecordingSession(frameRate: cameraManager.effectiveFrameRate, initialLayoutSnapshot: snapshot) {
+                        nativeMovieRecordingSnapshot = snapshot
+                        return
+                    }
+                    nativeMovieRecordingSnapshot = nil
+                    if let moviePair = try? await cameraManager.stopNativeMovieRecording() {
+                        try? FileManager.default.removeItem(at: moviePair.frontURL)
+                        if let backURL = moviePair.backURL {
+                            try? FileManager.default.removeItem(at: backURL)
+                        }
+                    }
+                }
+                nativeMovieRecordingSnapshot = nil
+                await videoRecorder.startRecording(frameRate: cameraManager.effectiveFrameRate)
+            }
+        case .photo(let livePhotoEnabled, let livePhotoDuration):
+            captureFeedback.perform(livePhotoEnabled ? .livePhotoShutterAccepted : .photoCaptured, enabled: soundAndHapticsEnabled)
+            Task<Void, Never> {
+                guard videoRecorder.recordingState == .idle else { return }
+                let snapshot = updateRecordingLayoutSnapshot()
+                if livePhotoEnabled,
+                   let nativeLivePhotoPair = try? await cameraManager.captureNativeLivePhotoPair() {
+                    await videoRecorder.captureNativeLivePhoto(
+                        front: nativeLivePhotoPair.front,
+                        back: nativeLivePhotoPair.back,
+                        layoutSnapshot: snapshot,
+                        saveToSystemPhotos: false
+                    )
+                    return
+                }
+                if !livePhotoEnabled,
+                   let nativePhotoPair = try? await cameraManager.captureNativePhotoPair() {
+                    await videoRecorder.captureNativePhoto(
+                        frontData: nativePhotoPair.frontData,
+                        backData: nativePhotoPair.backData,
+                        layoutSnapshot: snapshot,
+                        saveToSystemPhotos: false
+                    )
+                    return
+                }
+                await videoRecorder.capturePhoto(
+                    livePhotoEnabled: livePhotoEnabled,
+                    livePhotoDuration: livePhotoDuration,
+                    saveToSystemPhotos: false
+                )
+            }
+        }
+    }
+
+    private func stopActiveRecording() {
+        if let snapshot = nativeMovieRecordingSnapshot {
+            Task<Void, Never> {
+                do {
+                    let moviePair = try await cameraManager.stopNativeMovieRecording()
+                    nativeMovieRecordingSnapshot = nil
+                    await videoRecorder.finishNativeMovieRecording(
+                        frontURL: moviePair.frontURL,
+                        backURL: moviePair.backURL,
+                        layoutSnapshot: snapshot,
+                        saveToSystemPhotos: false
+                    )
+                } catch {
+                    nativeMovieRecordingSnapshot = nil
+                    videoRecorder.cancelNativeMovieRecordingSession(error: error)
+                }
+            }
+            return
+        }
+
+        Task<Void, Never> { await videoRecorder.stopRecording(saveToSystemPhotos: false) }
+    }
+
+    private func cancelCountdown() {
+        countdownTask?.cancel()
+        countdownTask = nil
+        guard countdownRemaining != nil else { return }
+        withAnimation(.easeOut(duration: 0.18)) {
+            countdownRemaining = nil
+        }
+    }
+
     private func completionFeedbackEvent(for draft: RecordedWorkDraft) -> CaptureFeedbackService.Event? {
         draft.kind == .video ? .recordingStopped : nil
     }
@@ -531,10 +742,57 @@ struct ContentView: View {
         layoutManager.switchLayout(to: layout)
     }
 
-    private func updateRecordingLayoutSnapshot() {
-        let snapshot = layoutManager.makeRecordingLayoutSnapshot(outputSize: videoRecorder.outputVideoSize)
+    private func applyMediaOutputSpec() {
+        videoRecorder.applyOutputSpec(mediaOutputSpec)
+    }
+
+    private func updatePreviewSize(_ size: CGSize) {
+        guard previewSize != size else { return }
+        previewSize = size
+        updateRecordingLayoutSnapshot()
+    }
+
+    private func makeRecordingSafeFrame(in size: CGSize, outputSize: CGSize) -> CGRect {
+        guard size.width > 0, size.height > 0, outputSize.width > 0, outputSize.height > 0 else {
+            return CGRect(origin: .zero, size: size)
+        }
+
+        let topReserved = min(max(size.height * 0.012, 8), 16)
+        let bottomReserved = min(max(size.height * 0.16, 132), 154)
+        let availableHeight = max(120, size.height - topReserved - bottomReserved)
+        let horizontalInset = min(max(size.width * 0.006, 0), 3)
+        let availableRect = CGRect(
+            x: horizontalInset,
+            y: topReserved,
+            width: max(1, size.width - horizontalInset * 2),
+            height: availableHeight
+        )
+        let outputAspect = outputSize.width / outputSize.height
+        let availableAspect = availableRect.width / availableRect.height
+
+        let frameSize: CGSize
+        if availableAspect > outputAspect {
+            frameSize = CGSize(width: availableRect.height * outputAspect, height: availableRect.height)
+        } else {
+            frameSize = CGSize(width: availableRect.width, height: availableRect.width / outputAspect)
+        }
+
+        return CGRect(
+            x: availableRect.midX - frameSize.width / 2,
+            y: availableRect.midY - frameSize.height / 2,
+            width: frameSize.width,
+            height: frameSize.height
+        )
+    }
+
+    @discardableResult
+    private func updateRecordingLayoutSnapshot() -> RecordingLayoutSnapshot {
+        let sourceFrame = previewSize == .zero ? nil : recordingSafeFrame
+        let snapshot = layoutManager.makeRecordingLayoutSnapshot(outputSize: activeOutputSize, sourceFrame: sourceFrame)
         videoRecorder.updateLayoutSnapshot(snapshot)
+        videoRecorder.updateNativeMovieRecordingLayout(snapshot)
         videoRecorder.updateWorkLayout(layoutManager.currentLayout)
+        return snapshot
     }
 
     private func clearRecordingHandlers() {
@@ -542,6 +800,38 @@ struct ContentView: View {
         cameraManager.frontVideoFrameHandler = nil
         cameraManager.backVideoFrameHandler = nil
         cameraManager.audioSampleBufferHandler = nil
+    }
+}
+
+private struct OutputSafeFrameMask: View {
+    let frame: CGRect
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.black.opacity(0)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(Color.white)
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+        }
+    }
+}
+
+private struct OutputSafeFrameOverlay: View {
+    let frame: CGRect
+    let isVisible: Bool
+
+    var body: some View {
+        if isVisible, frame.width > 0, frame.height > 0 {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.28), lineWidth: 1)
+                )
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+        }
     }
 }
 
@@ -780,8 +1070,10 @@ struct BottomControlBar: View {
     let captureMode: CaptureMode
     let latestWork: WorkItem?
     let showsSideControls: Bool
+    let isCountingDown: Bool
     let onStartRecording: () -> Void
     let onStopRecording: () -> Void
+    let onCancelCountdown: () -> Void
     let onCustomize: () -> Void
     let onOpenAlbum: () -> Void
 
@@ -798,8 +1090,10 @@ struct BottomControlBar: View {
             RecordButton(
                 recordingState: recordingState,
                 captureMode: captureMode,
+                isCountingDown: isCountingDown,
                 onStart: onStartRecording,
-                onStop: onStopRecording
+                onStop: onStopRecording,
+                onCancelCountdown: onCancelCountdown
             )
 
             Spacer()
@@ -857,8 +1151,10 @@ struct RecordButton: View {
 
     let recordingState: RecordingState
     let captureMode: CaptureMode
+    let isCountingDown: Bool
     let onStart: () -> Void
     let onStop: () -> Void
+    let onCancelCountdown: () -> Void
 
     @State private var isPressed = false
     @State private var pulseScale: CGFloat = 1.0
@@ -869,7 +1165,13 @@ struct RecordButton: View {
     var body: some View {
         Button(action: {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
-                isRecording ? onStop() : onStart()
+                if isCountingDown {
+                    onCancelCountdown()
+                } else if isRecording {
+                    onStop()
+                } else {
+                    onStart()
+                }
             }
         }) {
             ZStack {
@@ -885,7 +1187,13 @@ struct RecordButton: View {
                         .opacity(pulseOpacity)
                 }
 
-                if isRecording {
+                if isCountingDown {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 24, weight: .black))
+                        .foregroundColor(.white)
+                        .frame(width: 55, height: 55)
+                        .background(Circle().fill(Color.white.opacity(0.16)))
+                } else if isRecording {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(Design.recordRed)
                         .frame(width: 30, height: 30)
@@ -922,6 +1230,21 @@ struct RecordButton: View {
             pulseScale = 1.0
             pulseOpacity = 0
         }
+    }
+}
+
+private struct CaptureCountdownOverlay: View {
+    let remaining: Int
+
+    var body: some View {
+        Text("\(remaining)")
+            .font(.system(size: 96, weight: .black, design: .rounded))
+            .monospacedDigit()
+            .foregroundColor(.white)
+            .frame(width: 156, height: 156)
+            .background(Circle().fill(Color.black.opacity(0.42)))
+            .overlay(Circle().stroke(Design.accent.opacity(0.9), lineWidth: 3))
+            .shadow(color: Color.black.opacity(0.35), radius: 30, x: 0, y: 18)
     }
 }
 

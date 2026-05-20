@@ -199,6 +199,15 @@
 "works.delete.confirm.title" = "Delete selected works?";
 "works.delete.confirm.message" = "This will permanently delete %d selected works from this device.";
 "works.delete.success" = "Deleted %d works.";
+"works.highQuality.ready" = "High-quality video is ready.";
+"works.highQuality.phase.preparing" = "Preparing high-quality video…";
+"works.highQuality.phase.rendering" = "Generating high-quality video…";
+"works.highQuality.phase.audio" = "Finishing audio…";
+"works.highQuality.phase.finishing" = "Finalizing video…";
+"works.highQuality.phase.completed" = "High-quality video is ready.";
+"works.highQuality.phase.paused" = "High-quality generation paused.";
+"works.highQuality.phase.failed" = "High-quality generation failed.";
+"works.highQuality.phase.cancelled" = "High-quality generation cancelled.";
 
 "workDetail.title" = "Preview";
 "workDetail.back.works" = "Works";
@@ -208,6 +217,15 @@
 "workDetail.share" = "Share";
 "workDetail.edit" = "Edit";
 "workDetail.save" = "Save";
+"workDetail.highQuality.generate" = "HQ";
+"workDetail.highQuality.rendering" = "Rendering";
+"workDetail.highQuality.pause" = "Pause";
+"workDetail.highQuality.resume" = "Resume";
+"workDetail.highQuality.cancel" = "Cancel";
+"workDetail.highQuality.ready" = "HQ Ready";
+"workDetail.highQuality.readyMessage" = "This work is already using the high-quality composite video. You can save it to Photos directly.";
+"workDetail.highQuality.retry" = "Retry HQ";
+"workDetail.highQuality.unavailable" = "HQ";
 
 "error.works.readFailed" = "Unable to read DualCam works: %@";
 "error.works.saveFailed" = "Unable to save this work: %@";
@@ -215,6 +233,9 @@
 "error.works.photoLibraryDenied" = "Allow adding works to Photos in Settings.";
 "error.works.exportFailed" = "Unable to save to Photos: %@";
 "error.works.deleteFailed" = "Unable to delete works: %@";
+"error.works.highQualityFailed" = "Unable to generate high-quality video: %@";
+"error.works.highQualityMissingOriginals" = "The original front/back recording is missing.";
+"error.works.highQualityMissingTimeline" = "This work does not have layout timeline data for high-quality rendering.";
 
 "settings.ok" = "OK";
 "settings.section.shootingDefaults" = "Shooting Defaults";
@@ -240,16 +261,33 @@
 "settings.rememberLastLayout.title" = "Remember Last Layout";
 "settings.rememberLastLayout.subtitle" = "Reopen the camera with the last template you used.";
 
+"settings.mediaOutput.title" = "Media Output";
+"settings.mediaOutput.subtitle" = "Photo ratio, video clarity, and current effective spec.";
+"settings.mediaOutput.effective" = "Current Effective";
+"settings.mediaOutput.format" = "Format";
+"settings.mediaOutput.format.compatible" = "JPEG + MP4/H.264";
+"settings.mediaOutput.liveCanvas" = "Live Photo Canvas";
+"settings.mediaOutput.liveCanvas.followPhoto" = "Follow Photo";
+"settings.mediaOutput.fallback" = "Native Output Status";
+"settings.mediaOutput.fallback.pending" = "Checking native output support.";
+"settings.mediaOutput.fallback.ready" = "Native first, automatic fallback on failure.";
+"settings.mediaOutput.fallback.usingFallback" = "Native dual photo/movie outputs are not fully available. Using the compatible fallback pipeline.";
+"settings.photoAspectRatio.title" = "Photo Ratio";
+"settings.photoAspectRatio.subtitle" = "Default canvas for photos and Live Photos.";
+"settings.photoAspectRatio.3x4" = "3:4";
+"settings.photoAspectRatio.9x16" = "9:16";
+"settings.photoAspectRatio.3x4.description" = "Native-camera-like photo feel, output at 1080×1440.";
+"settings.photoAspectRatio.9x16.description" = "Vertical social ratio, output at 1080×1920.";
 "settings.videoResolution.title" = "Video Resolution";
-"settings.videoResolution.subtitle" = "Saved as a preference; current recorder output remains 720p in this pass.";
+"settings.videoResolution.subtitle" = "Controls the DualCam composed video output canvas.";
 "settings.videoResolution.720p" = "720p";
 "settings.videoResolution.1080p" = "1080p";
-"settings.videoResolution.720p.description" = "Current stable recorder output.";
-"settings.videoResolution.1080p.description" = "Preference saved for the next recorder upgrade.";
+"settings.videoResolution.720p.description" = "Lower-load fallback output.";
+"settings.videoResolution.1080p.description" = "Default HD output, 1080×1920.";
 "settings.frameRate.title" = "Frame Rate";
 "settings.frameRate.subtitle" = "Applied when the recorder is idle or before the next recording starts.";
 "settings.videoCodec.title" = "Video Format";
-"settings.videoCodec.subtitle" = "Saved for future recordings; current writer remains H.264 in this pass.";
+"settings.videoCodec.subtitle" = "This pass keeps the compatible format and falls back automatically if native output fails.";
 "settings.videoCodec.h264" = "H.264";
 "settings.videoCodec.hevc" = "HEVC";
 "settings.videoCodec.h264.description" = "Broad compatibility across devices and apps.";

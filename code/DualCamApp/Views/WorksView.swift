@@ -1,6 +1,7 @@
 import AVKit
 import Combine
 import Photos
+import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -549,36 +550,38 @@ private struct WorkDetailPage: View {
             ZStack {
                 WorksDesign.background.ignoresSafeArea()
 
-                VStack(alignment: .leading, spacing: 12) {
-                    preview
-                        .frame(maxWidth: .infinity)
-                        .frame(height: detailPreviewHeight(for: geometry.size))
-                        .padding(.top, 8)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        preview(maxHeight: previewMaxHeight(in: geometry))
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, detailTopPadding(in: geometry))
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(item.title)
-                            .font(.system(size: 26, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(liveItem.title)
+                                .font(.system(size: 26, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .lineLimit(2)
 
-                        Text(metadataText)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(WorksDesign.mutedText)
+                            Text(metadataText)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(WorksDesign.mutedText)
 
-                        Text("workDetail.body")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(WorksDesign.mutedText)
-                            .fixedSize(horizontal: false, vertical: true)
+                            Text("workDetail.body")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(WorksDesign.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
 
-                        actionRow
+                            highQualityProgressPanel
+                            actionRow
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 18)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 18)
                 }
             }
         }
         .sheet(isPresented: $isSharing) {
-            ActivityView(activityItems: [item.assetURL])
+            ActivityView(activityItems: [exportURL])
         }
         .alert("works.message.title", isPresented: detailMessageBinding) {
             Button("works.action.ok", role: .cancel) {}
@@ -596,8 +599,15 @@ private struct WorkDetailPage: View {
         )
     }
 
-    private var preview: some View {
-        WorkPreview(item: item, isActive: isActive)
+    private var liveItem: WorkItem {
+        manager.item(withID: item.id) ?? item
+    }
+
+    private func preview(maxHeight: CGFloat) -> some View {
+        previewContent(maxHeight: maxHeight)
+            .frame(maxWidth: .infinity)
+            .frame(height: maxHeight)
+            .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 32, style: .continuous)
@@ -606,8 +616,59 @@ private struct WorkDetailPage: View {
             .padding(.horizontal, 12)
     }
 
-    private func detailPreviewHeight(for size: CGSize) -> CGFloat {
-        min(max(size.height - 250, size.height * 0.70), size.height - 190)
+    @ViewBuilder
+    private func previewContent(maxHeight: CGFloat) -> some View {
+        if liveItem.kind == .video {
+            WorkPreview(item: liveItem, isActive: isActive)
+                .frame(maxWidth: .infinity)
+                .frame(height: maxHeight)
+        } else {
+            WorkPreview(item: liveItem, isActive: isActive)
+                .aspectRatio(previewAspectRatio, contentMode: .fill)
+                .frame(maxWidth: .infinity)
+                .frame(height: maxHeight)
+        }
+    }
+
+    private func previewMaxHeight(in geometry: GeometryProxy) -> CGFloat {
+        let availableWidth = max(1, geometry.size.width - 24)
+        let naturalHeight = availableWidth / max(previewAspectRatio, 0.1)
+        let reserveForDetails = detailReservedHeight(in: geometry)
+        let maximumHeight = max(220, geometry.size.height - reserveForDetails)
+
+        return min(naturalHeight, maximumHeight)
+    }
+
+    private func detailReservedHeight(in geometry: GeometryProxy) -> CGFloat {
+        let compact = geometry.size.height < 720
+        switch liveItem.kind {
+        case .photo:
+            return compact ? 154 : 172
+        case .video:
+            if showsHighQualityProgressPanel {
+                return compact ? 244 : 270
+            }
+            return compact ? 168 : 188
+        }
+    }
+
+    private func detailTopPadding(in geometry: GeometryProxy) -> CGFloat {
+        geometry.size.height < 680 ? 4 : 8
+    }
+
+    private var showsHighQualityProgressPanel: Bool {
+        liveItem.kind == .video && liveItem.frontOriginalURL != nil && liveItem.highQualityRenderStatus != .notStarted
+    }
+
+    private var previewAspectRatio: CGFloat {
+        let normalizedResolution = liveItem.cameraMetadata.resolution.replacingOccurrences(of: "x", with: "×")
+        let dimensions = normalizedResolution
+            .split(separator: "×")
+            .compactMap { Double($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        guard dimensions.count == 2, dimensions[0] > 0, dimensions[1] > 0 else {
+            return liveItem.kind == .video ? 9.0 / 16.0 : 3.0 / 4.0
+        }
+        return CGFloat(dimensions[0] / dimensions[1])
     }
 
     private var actionRow: some View {
@@ -616,7 +677,9 @@ private struct WorkDetailPage: View {
                 isSharing = true
             }
 
-            DetailActionButton(titleKey: "workDetail.edit", icon: "slider.horizontal.3", isEnabled: false) {}
+            DetailActionButton(titleKey: highQualityActionTitleKey, icon: highQualityActionIcon, isEnabled: canUseHighQualityPrimaryAction) {
+                performHighQualityPrimaryAction()
+            }
 
             DetailActionButton(titleKey: "workDetail.save", icon: "checkmark.circle", isEnabled: !isSavingToPhotos) {
                 Task { await saveWorkToPhotoLibrary() }
@@ -625,24 +688,169 @@ private struct WorkDetailPage: View {
         .padding(.top, 4)
     }
 
+    private var exportURL: URL {
+        liveItem.highQualityURL ?? liveItem.assetURL
+    }
+
+    private var shouldTreatCurrentVideoAsHighQualityReady: Bool {
+        guard liveItem.kind == .video else { return false }
+        return liveItem.highQualityRenderStatus == .ready
+            || liveItem.highQualityURL != nil
+            || liveItem.frontOriginalURL == nil
+    }
+
+    private var canUseHighQualityPrimaryAction: Bool {
+        guard liveItem.kind == .video else { return false }
+        if shouldTreatCurrentVideoAsHighQualityReady {
+            return true
+        }
+        return liveItem.frontOriginalURL != nil && liveItem.highQualityRenderStatus != .rendering
+    }
+
+    private var highQualityActionTitleKey: LocalizedStringKey {
+        if liveItem.kind != .video {
+            return "workDetail.highQuality.unavailable"
+        }
+        if shouldTreatCurrentVideoAsHighQualityReady {
+            return "workDetail.highQuality.ready"
+        }
+        if liveItem.frontOriginalURL == nil {
+            return "workDetail.highQuality.unavailable"
+        }
+        switch liveItem.highQualityRenderStatus {
+        case .notStarted, .cancelled:
+            return "workDetail.highQuality.generate"
+        case .rendering:
+            return "workDetail.highQuality.rendering"
+        case .paused:
+            return "workDetail.highQuality.resume"
+        case .ready:
+            return "workDetail.highQuality.ready"
+        case .failed:
+            return "workDetail.highQuality.retry"
+        }
+    }
+
+    private var highQualityActionIcon: String {
+        if shouldTreatCurrentVideoAsHighQualityReady {
+            return "checkmark.seal.fill"
+        }
+        switch liveItem.highQualityRenderStatus {
+        case .ready:
+            return "checkmark.seal.fill"
+        case .rendering:
+            return "hourglass"
+        case .paused:
+            return "play.fill"
+        case .failed:
+            return "arrow.clockwise"
+        case .notStarted, .cancelled:
+            return "wand.and.stars"
+        }
+    }
+
+    private var highQualityProgressPanel: some View {
+        Group {
+            if showsHighQualityProgressPanel {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text(liveItem.highQualityRenderMessage ?? highQualityStatusText)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white.opacity(0.82))
+                        Spacer()
+                        Text(renderProgressText)
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundColor(WorksDesign.accent)
+                    }
+
+                    ProgressView(value: liveItem.highQualityRenderProgress)
+                        .tint(WorksDesign.accent)
+
+                    if liveItem.highQualityRenderStatus == .rendering || liveItem.highQualityRenderStatus == .paused {
+                        HStack(spacing: 8) {
+                            Button(action: toggleHighQualityPause) {
+                                Label(liveItem.highQualityRenderStatus == .paused ? "workDetail.highQuality.resume" : "workDetail.highQuality.pause", systemImage: liveItem.highQualityRenderStatus == .paused ? "play.fill" : "pause.fill")
+                            }
+                            Button(role: .destructive, action: { manager.cancelHighQualityRender(for: liveItem) }) {
+                                Label("workDetail.highQuality.cancel", systemImage: "xmark")
+                            }
+                        }
+                        .font(.system(size: 12, weight: .bold))
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.07)))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.white.opacity(0.10), lineWidth: 0.8))
+            }
+        }
+    }
+
+    private var renderProgressText: String {
+        "\(Int((liveItem.highQualityRenderProgress * 100).rounded()))%"
+    }
+
+    private var highQualityStatusText: String {
+        switch liveItem.highQualityRenderStatus {
+        case .notStarted:
+            return L10n.string("works.highQuality.phase.preparing")
+        case .rendering:
+            return L10n.string("works.highQuality.phase.rendering")
+        case .paused:
+            return L10n.string("works.highQuality.phase.paused")
+        case .ready:
+            return L10n.string("works.highQuality.phase.completed")
+        case .failed:
+            return L10n.string("works.highQuality.phase.failed")
+        case .cancelled:
+            return L10n.string("works.highQuality.phase.cancelled")
+        }
+    }
+
     private var metadataText: String {
         L10n.string(
             "workDetail.metadata",
-            item.localizedLayoutTitle,
-            item.cameraMetadata.resolution,
-            item.cameraMetadata.frameRate,
-            item.workDurationText
+            liveItem.localizedLayoutTitle,
+            liveItem.cameraMetadata.resolution,
+            liveItem.cameraMetadata.frameRate,
+            liveItem.workDurationText
         )
+    }
+
+    private func performHighQualityPrimaryAction() {
+        if shouldTreatCurrentVideoAsHighQualityReady {
+            detailMessage = L10n.string("workDetail.highQuality.readyMessage")
+            return
+        }
+
+        switch liveItem.highQualityRenderStatus {
+        case .paused:
+            manager.resumeHighQualityRender(for: liveItem)
+        case .notStarted, .failed, .cancelled:
+            manager.startHighQualityRender(for: liveItem)
+        case .ready:
+            detailMessage = L10n.string("workDetail.highQuality.readyMessage")
+        case .rendering:
+            break
+        }
+    }
+
+    private func toggleHighQualityPause() {
+        if liveItem.highQualityRenderStatus == .paused {
+            manager.resumeHighQualityRender(for: liveItem)
+        } else {
+            manager.pauseHighQualityRender(for: liveItem)
+        }
     }
 
     @MainActor
     private func saveWorkToPhotoLibrary() async {
         guard !isSavingToPhotos else { return }
-        guard FileManager.default.fileExists(atPath: item.assetURL.path) else {
+        guard FileManager.default.fileExists(atPath: exportURL.path) else {
             detailMessage = L10n.string("error.works.fileMissing")
             return
         }
-        if let pairedVideoURL = item.pairedVideoURL,
+        if let pairedVideoURL = liveItem.pairedVideoURL,
            !FileManager.default.fileExists(atPath: pairedVideoURL.path) {
             detailMessage = L10n.string("error.works.fileMissing")
             return
@@ -660,23 +868,23 @@ private struct WorkDetailPage: View {
             return
         }
 
-        let photoImage = item.kind == .photo && item.pairedVideoURL == nil
-            ? UIImage(contentsOfFile: item.assetURL.path)
+        let photoImage = liveItem.kind == .photo && liveItem.pairedVideoURL == nil
+            ? UIImage(contentsOfFile: liveItem.assetURL.path)
             : nil
-        if item.kind == .photo && item.pairedVideoURL == nil && photoImage == nil {
+        if liveItem.kind == .photo && liveItem.pairedVideoURL == nil && photoImage == nil {
             detailMessage = L10n.string("error.works.fileMissing")
             return
         }
 
         do {
             try await performPhotoLibraryChanges {
-                switch item.kind {
+                switch liveItem.kind {
                 case .video:
-                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: item.assetURL)
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: exportURL)
                 case .photo:
-                    if let pairedVideoURL = item.pairedVideoURL {
+                    if let pairedVideoURL = liveItem.pairedVideoURL {
                         let request = PHAssetCreationRequest.forAsset()
-                        request.addResource(with: .photo, fileURL: item.assetURL, options: nil)
+                        request.addResource(with: .photo, fileURL: liveItem.assetURL, options: nil)
                         request.addResource(with: .pairedVideo, fileURL: pairedVideoURL, options: nil)
                     } else if let photoImage {
                         PHAssetChangeRequest.creationRequestForAsset(from: photoImage)
@@ -711,9 +919,119 @@ private struct WorkPreview: View {
     var body: some View {
         if item.kind == .video {
             InlineVideoPreview(item: item, isActive: isActive)
+        } else if let pairedVideoURL = item.pairedVideoURL {
+            InlineLivePhotoPreview(stillURL: item.assetURL, pairedVideoURL: pairedVideoURL, fallbackURL: item.thumbnailURL ?? item.assetURL, isActive: isActive)
         } else {
             WorkThumbnail(url: item.thumbnailURL ?? item.assetURL)
         }
+    }
+}
+
+private struct InlineLivePhotoPreview: View {
+    let stillURL: URL
+    let pairedVideoURL: URL
+    let fallbackURL: URL?
+    let isActive: Bool
+    @State private var playbackToken = 0
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if FileManager.default.fileExists(atPath: stillURL.path),
+               FileManager.default.fileExists(atPath: pairedVideoURL.path) {
+                LivePhotoView(stillURL: stillURL, pairedVideoURL: pairedVideoURL, isActive: isActive, playbackToken: playbackToken)
+                    .background(WorkThumbnail(url: fallbackURL))
+            } else {
+                WorkThumbnail(url: fallbackURL)
+            }
+
+            VStack {
+                HStack {
+                    Text("livePhoto.badge")
+                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(WorksDesign.accent))
+                    Spacer()
+                }
+                Spacer()
+            }
+            .padding(18)
+
+            Button(action: { playbackToken += 1 }) {
+                Image(systemName: "livephoto.play")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundColor(.black)
+                    .frame(width: 48, height: 48)
+                    .background(Circle().fill(WorksDesign.accent))
+                    .overlay(Circle().stroke(Color.black.opacity(0.18), lineWidth: 1))
+                    .shadow(color: Color.black.opacity(0.24), radius: 12, x: 0, y: 6)
+            }
+            .padding(18)
+            .disabled(!FileManager.default.fileExists(atPath: stillURL.path) || !FileManager.default.fileExists(atPath: pairedVideoURL.path))
+        }
+    }
+}
+
+private struct LivePhotoView: UIViewRepresentable {
+    let stillURL: URL
+    let pairedVideoURL: URL
+    let isActive: Bool
+    let playbackToken: Int
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> PHLivePhotoView {
+        let view = PHLivePhotoView()
+        view.contentMode = .scaleAspectFill
+        view.clipsToBounds = true
+        view.isMuted = false
+        loadLivePhoto(into: view, context: context)
+        return view
+    }
+
+    func updateUIView(_ view: PHLivePhotoView, context: Context) {
+        if context.coordinator.stillURL != stillURL || context.coordinator.pairedVideoURL != pairedVideoURL {
+            loadLivePhoto(into: view, context: context)
+        } else if isActive && context.coordinator.playbackToken != playbackToken {
+            context.coordinator.playbackToken = playbackToken
+            view.startPlayback(with: .full)
+        } else if !isActive {
+            view.stopPlayback()
+        }
+    }
+
+    private func loadLivePhoto(into view: PHLivePhotoView, context: Context) {
+        context.coordinator.stillURL = stillURL
+        context.coordinator.pairedVideoURL = pairedVideoURL
+        context.coordinator.playbackToken = playbackToken
+        let requestID = UUID()
+        context.coordinator.requestID = requestID
+        let placeholder = UIImage(contentsOfFile: stillURL.path)
+
+        PHLivePhoto.request(
+            withResourceFileURLs: [stillURL, pairedVideoURL],
+            placeholderImage: placeholder,
+            targetSize: .zero,
+            contentMode: .aspectFill
+        ) { livePhoto, _ in
+            DispatchQueue.main.async {
+                guard context.coordinator.requestID == requestID else { return }
+                view.livePhoto = livePhoto
+                if isActive, livePhoto != nil {
+                    view.startPlayback(with: .hint)
+                }
+            }
+        }
+    }
+
+    final class Coordinator {
+        var stillURL: URL?
+        var pairedVideoURL: URL?
+        var playbackToken = 0
+        var requestID = UUID()
     }
 }
 

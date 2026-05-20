@@ -127,10 +127,27 @@ final class LayoutManagerTests: XCTestCase {
     }
 
     func testRecordingLayoutSnapshotScalesFramesAndPreservesMetadata() {
+        assertRecordingSnapshotScales(outputSize: CGSize(width: 1080, height: 1920))
+    }
+
+    func testPhotoRecordingLayoutSnapshotUsesThreeByFourCanvas() {
+        assertRecordingSnapshotScales(outputSize: CGSize(width: 1080, height: 1440))
+    }
+
+    func testSafeSourceFrameSnapshotAvoidsLetterboxing() {
+        let manager = makeManager(layout: .pictureInPicture)
+        let safeFrame = CGRect(x: 0, y: 162, width: 390, height: 520)
+
+        let snapshot = manager.makeRecordingLayoutSnapshot(outputSize: CGSize(width: 1080, height: 1440), sourceFrame: safeFrame)
+
+        TestSupport.assertRect(snapshot.back.frame, CGRect(x: 0, y: -448.6153846153846, width: 1080, height: 2337.230769230769), accuracy: 0.001)
+        XCTAssertEqual(snapshot.outputSize, CGSize(width: 1080, height: 1440))
+    }
+
+    private func assertRecordingSnapshotScales(outputSize: CGSize, file: StaticString = #filePath, line: UInt = #line) {
         let manager = makeManager(layout: .pictureInPicture)
         let frontBefore = manager.getFrontCameraLayout()
         let backBefore = manager.getBackCameraLayout()
-        let outputSize = CGSize(width: 1080, height: 1920)
 
         let snapshot = manager.makeRecordingLayoutSnapshot(outputSize: outputSize)
 
@@ -138,9 +155,9 @@ final class LayoutManagerTests: XCTestCase {
         let scaledSize = CGSize(width: manager.containerSize.width * scale, height: manager.containerSize.height * scale)
         let origin = CGPoint(x: (outputSize.width - scaledSize.width) / 2, y: (outputSize.height - scaledSize.height) / 2)
 
-        XCTAssertEqual(snapshot.outputSize, outputSize)
-        assertScaled(snapshot.front, from: frontBefore, scale: scale, origin: origin)
-        assertScaled(snapshot.back, from: backBefore, scale: scale, origin: origin)
+        XCTAssertEqual(snapshot.outputSize, outputSize, file: file, line: line)
+        assertScaled(snapshot.front, from: frontBefore, scale: scale, origin: origin, file: file, line: line)
+        assertScaled(snapshot.back, from: backBefore, scale: scale, origin: origin, file: file, line: line)
     }
 
     private func makeManager(layout: LayoutType) -> LayoutManager {

@@ -5,6 +5,7 @@
 //  布局管理器 - 负责管理双摄像头画面的布局方式
 //
 
+import AVFoundation
 import Combine
 import SwiftUI
 
@@ -69,7 +70,7 @@ enum LayoutType: String, CaseIterable, Identifiable {
 }
 
 /// 摄像头裁剪形状
-enum CameraClipShape: String, CaseIterable, Identifiable {
+enum CameraClipShape: String, Codable, CaseIterable, Identifiable {
     case rectangle
     case roundedRectangle
     case circle
@@ -89,7 +90,7 @@ enum CameraClipShape: String, CaseIterable, Identifiable {
 }
 
 /// 单个摄像头视图的布局信息
-struct CameraLayoutInfo {
+struct CameraLayoutInfo: Codable, Equatable {
     var frame: CGRect
     var zIndex: Double
     var cornerRadius: CGFloat
@@ -97,10 +98,27 @@ struct CameraLayoutInfo {
     var clipShape: CameraClipShape
 }
 
-struct RecordingLayoutSnapshot {
+struct RecordingLayoutSnapshot: Codable, Equatable {
     let front: CameraLayoutInfo
     let back: CameraLayoutInfo
     let outputSize: CGSize
+}
+
+struct WorkLayoutTimelineEntry: Codable, Equatable {
+    let seconds: Double
+    let snapshot: RecordingLayoutSnapshot
+
+    var time: CMTime { CMTime(seconds: seconds, preferredTimescale: 600) }
+
+    init(seconds: Double, snapshot: RecordingLayoutSnapshot) {
+        self.seconds = max(0, seconds)
+        self.snapshot = snapshot
+    }
+
+    init(time: CMTime, snapshot: RecordingLayoutSnapshot) {
+        self.seconds = time.isValid && time.isNumeric ? max(0, time.seconds) : 0
+        self.snapshot = snapshot
+    }
 }
 
 /// 布局管理器
@@ -321,13 +339,13 @@ class LayoutManager: ObservableObject {
         return layout.frame.contains(point)
     }
 
-    func makeRecordingLayoutSnapshot(outputSize: CGSize) -> RecordingLayoutSnapshot {
-        let sourceSize = containerSize == .zero ? outputSize : containerSize
-        let scale = min(outputSize.width / sourceSize.width, outputSize.height / sourceSize.height)
-        let scaledSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+    func makeRecordingLayoutSnapshot(outputSize: CGSize, sourceFrame: CGRect? = nil) -> RecordingLayoutSnapshot {
+        let sourceFrame = resolvedRecordingSourceFrame(outputSize: outputSize, sourceFrame: sourceFrame)
+        let scale = min(outputSize.width / sourceFrame.width, outputSize.height / sourceFrame.height)
+        let scaledSize = CGSize(width: sourceFrame.width * scale, height: sourceFrame.height * scale)
         let origin = CGPoint(
-            x: (outputSize.width - scaledSize.width) / 2,
-            y: (outputSize.height - scaledSize.height) / 2
+            x: (outputSize.width - scaledSize.width) / 2 - sourceFrame.minX * scale,
+            y: (outputSize.height - scaledSize.height) / 2 - sourceFrame.minY * scale
         )
 
         return RecordingLayoutSnapshot(
@@ -335,6 +353,16 @@ class LayoutManager: ObservableObject {
             back: scaledLayout(getBackCameraLayout(), scale: scale, origin: origin),
             outputSize: outputSize
         )
+    }
+
+    private func resolvedRecordingSourceFrame(outputSize: CGSize, sourceFrame: CGRect?) -> CGRect {
+        if let sourceFrame,
+           sourceFrame.width > 0,
+           sourceFrame.height > 0 {
+            return sourceFrame
+        }
+        let sourceSize = containerSize == .zero ? outputSize : containerSize
+        return CGRect(origin: .zero, size: sourceSize)
     }
 
     private func scaledLayout(_ layout: CameraLayoutInfo, scale: CGFloat, origin: CGPoint) -> CameraLayoutInfo {
