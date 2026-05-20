@@ -770,8 +770,9 @@ struct ContentView: View {
             return CGRect(origin: .zero, size: size)
         }
 
-        let topReserved = min(max(size.height * 0.012, 8), 16)
-        let bottomReserved = min(max(size.height * 0.16, 132), 154)
+        let frameVerticalShift = min(max(size.height * 0.026, 18), 24)
+        let topReserved = min(max(size.height * 0.012, 8), 16) + frameVerticalShift
+        let bottomReserved = max(96, min(max(size.height * 0.16, 132), 154) - frameVerticalShift)
         let availableHeight = max(120, size.height - topReserved - bottomReserved)
         let horizontalInset = min(max(size.width * 0.006, 0), 3)
         let availableRect = CGRect(
