@@ -98,6 +98,7 @@ struct ContentView: View {
     @AppStorage(SettingsKey.recordingCountdownSeconds) private var recordingCountdownSeconds = RecordingCountdown.off.rawValue
     @AppStorage(SettingsKey.soundAndHapticsEnabled) private var soundAndHapticsEnabled = true
     @AppStorage(SettingsKey.lastRearFocalLength) private var lastRearFocalLength: Double = 1.0
+    @AppStorage(SettingsKey.autoClearCache) private var autoClearCache = false
 
     private var isVideoRecording: Bool {
         captureMode == .video && videoRecorder.recordingState == .recording
@@ -258,6 +259,7 @@ struct ContentView: View {
             applyMediaOutputSpec()
             updateRecordingLayoutSnapshot()
             updateLivePhotoPrebuffering()
+            cleanCacheIfEnabled()
             let frameRate = shootingFrameRate
             Task<Void, Never> {
                 await cameraManager.setPreferredFrameRate(Int32(frameRate))
@@ -308,6 +310,9 @@ struct ContentView: View {
             } else {
                 resetRecordingControls()
             }
+            if state == .idle {
+                cleanCacheIfEnabled()
+            }
         }
         .onChange(of: videoRecorder.errorMessage) { errorMessage in
             guard errorMessage != nil else { return }
@@ -331,6 +336,9 @@ struct ContentView: View {
         }
         .onChange(of: defaultLivePhotoDuration) { _ in
             updateLivePhotoPrebuffering()
+        }
+        .onChange(of: autoClearCache) { _ in
+            cleanCacheIfEnabled()
         }
         .onChange(of: layoutManager.currentLayout) { layout in
             lastLayoutRaw = layout.rawValue
@@ -548,6 +556,11 @@ struct ContentView: View {
             captureMode == .photo && isLivePhotoEnabled,
             duration: min(max(defaultLivePhotoDuration, 1.0), 10.0)
         )
+    }
+
+    private func cleanCacheIfEnabled() {
+        guard autoClearCache, videoRecorder.recordingState == .idle else { return }
+        worksManager.cleanCacheIfNeeded()
     }
 
     private func beginCaptureWithOptionalCountdown() {

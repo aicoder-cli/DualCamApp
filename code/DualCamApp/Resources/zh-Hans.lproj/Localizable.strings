@@ -233,6 +233,7 @@
 "error.works.photoLibraryDenied" = "请在设置中允许添加作品到相册。";
 "error.works.exportFailed" = "保存到相册失败：%@";
 "error.works.deleteFailed" = "无法删除作品：%@";
+"error.works.cacheClearFailed" = "无法清理缓存：%@";
 "error.works.highQualityFailed" = "无法生成高清合成视频：%@";
 "error.works.highQualityMissingOriginals" = "前后摄原始录制文件不存在。";
 "error.works.highQualityMissingTimeline" = "这个作品缺少用于高清合成的布局时间线。";
@@ -327,7 +328,7 @@
 "settings.workNaming.dateOnly.description" = "仅使用拍摄日期。";
 "settings.workNaming.sequence.description" = "使用递增序号。";
 "settings.autoClearCache.title" = "自动清理缓存";
-"settings.autoClearCache.subtitle" = "后续自动移除临时本地文件。";
+"settings.autoClearCache.subtitle" = "空闲时自动移除临时拍摄文件和未使用缩略图。";
 
 "settings.photosPermissionDenied.title" = "需要相册权限";
 "settings.photosPermissionDenied.message" = "请在 iOS 设置中允许 DualCam 添加项目到相册，或仅保存到 DualCam 作品集。";

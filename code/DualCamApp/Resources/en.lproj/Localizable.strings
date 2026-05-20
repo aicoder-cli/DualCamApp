@@ -233,6 +233,7 @@
 "error.works.photoLibraryDenied" = "Allow adding works to Photos in Settings.";
 "error.works.exportFailed" = "Unable to save to Photos: %@";
 "error.works.deleteFailed" = "Unable to delete works: %@";
+"error.works.cacheClearFailed" = "Unable to clear cache: %@";
 "error.works.highQualityFailed" = "Unable to generate high-quality video: %@";
 "error.works.highQualityMissingOriginals" = "The original front/back recording is missing.";
 "error.works.highQualityMissingTimeline" = "This work does not have layout timeline data for high-quality rendering.";
@@ -327,7 +328,7 @@
 "settings.workNaming.dateOnly.description" = "Use the capture date only.";
 "settings.workNaming.sequence.description" = "Use an increasing sequence number.";
 "settings.autoClearCache.title" = "Auto-clear Cache";
-"settings.autoClearCache.subtitle" = "Remove temporary local files automatically in a later pass.";
+"settings.autoClearCache.subtitle" = "Remove temporary capture files and unused thumbnails while idle.";
 
 "settings.photosPermissionDenied.title" = "Photos Permission Needed";
 "settings.photosPermissionDenied.message" = "Allow DualCam to add items to Photos in iOS Settings, or keep saving works only inside DualCam.";

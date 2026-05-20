@@ -239,6 +239,7 @@ final class WorksManager: ObservableObject {
     private let indexURL: URL
     private let thumbnailsDirectory: URL
     private let documentsDirectory: URL
+    private let temporaryDirectory: URL
     private var highQualityRenderJobs: [WorkItem.ID: HighQualityRenderJob] = [:]
 
     var latestWork: WorkItem? { items.first }
@@ -247,6 +248,7 @@ final class WorksManager: ObservableObject {
         self.fileManager = fileManager
         self.userDefaults = userDefaults
         documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        temporaryDirectory = fileManager.temporaryDirectory
         let supportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DualCamApp", isDirectory: true)
         thumbnailsDirectory = supportDirectory.appendingPathComponent("WorksThumbnails", isDirectory: true)
@@ -283,6 +285,15 @@ final class WorksManager: ObservableObject {
             readError = nil
         } catch {
             readError = L10n.string("error.works.saveFailed", error.localizedDescription)
+        }
+    }
+
+    func cleanCacheIfNeeded() {
+        guard userDefaults.bool(forKey: SettingsKey.autoClearCache) else { return }
+        do {
+            try cleanCache()
+        } catch {
+            readError = L10n.string("error.works.cacheClearFailed", error.localizedDescription)
         }
     }
 
@@ -527,6 +538,33 @@ final class WorksManager: ObservableObject {
 
     private func ensureDirectories() throws {
         try fileManager.createDirectory(at: thumbnailsDirectory, withIntermediateDirectories: true)
+    }
+
+    private func cleanCache() throws {
+        try ensureDirectories()
+        try removeTemporaryCaptureFiles()
+        try removeOrphanedThumbnails()
+    }
+
+    private func removeTemporaryCaptureFiles() throws {
+        let urls = try fileManager.contentsOfDirectory(at: temporaryDirectory, includingPropertiesForKeys: nil)
+        for url in urls where isDualCamTemporaryCaptureFile(url) {
+            try removeFileIfPresent(at: url)
+        }
+    }
+
+    private func removeOrphanedThumbnails() throws {
+        let referencedThumbnailPaths = Set(items.compactMap { $0.thumbnailURL.map { assetPath(for: $0) } })
+        let urls = try fileManager.contentsOfDirectory(at: thumbnailsDirectory, includingPropertiesForKeys: nil)
+        for url in urls where !referencedThumbnailPaths.contains(assetPath(for: url)) {
+            try removeFileIfPresent(at: url)
+        }
+    }
+
+    private func isDualCamTemporaryCaptureFile(_ url: URL) -> Bool {
+        let name = url.lastPathComponent
+        guard name.hasPrefix("dualcam_native_") || name.hasPrefix("dualcam_native_live_") else { return false }
+        return url.pathExtension.lowercased() == "mov"
     }
 
     private func loadIndex() throws -> [WorkItem] {
