@@ -2015,9 +2015,7 @@ class VideoRecorder: ObservableObject {
     }
 
     private func makeOutputURL() -> URL {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileName = "dual_camera_\(UUID().uuidString).mp4"
-        return documentsPath.appendingPathComponent(fileName)
+        outputURL(extension: "mp4")
     }
 
     private func persistNativeOriginalMovie(from temporaryURL: URL, cameraName: String) throws -> URL {
@@ -2031,21 +2029,25 @@ class VideoRecorder: ObservableObject {
     }
 
     private func makePhotoOutputURL() -> URL {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileName = "dual_camera_photo_\(UUID().uuidString).jpg"
-        return documentsPath.appendingPathComponent(fileName)
+        outputURL(extension: "jpg", prefix: "photo")
     }
 
     private func makeLivePhotoStillOutputURL() -> URL {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileName = "dual_camera_live_\(UUID().uuidString).jpg"
-        return documentsPath.appendingPathComponent(fileName)
+        outputURL(extension: "jpg", prefix: "live")
     }
 
     private func makeLivePhotoMovieOutputURL() -> URL {
+        outputURL(extension: "mov", prefix: "live")
+    }
+
+    private func outputURL(extension fileExtension: String, prefix: String? = nil) -> URL {
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileName = "dual_camera_live_\(UUID().uuidString).mov"
-        return documentsPath.appendingPathComponent(fileName)
+        let stem = currentWorkNamingRule.fileNameStem(for: Date(), layout: latestLayoutIdentifier, prefix: prefix)
+        return documentsPath.appendingPathComponent("\(stem).\(fileExtension)")
+    }
+
+    private var currentWorkNamingRule: WorkNamingRule {
+        WorkNamingRule.from(UserDefaults.standard.string(forKey: SettingsKey.workNamingRule) ?? WorkNamingRule.dateLayout.rawValue)
     }
 
     private func savePhotoToPhotoLibrary(_ photoURL: URL) async {

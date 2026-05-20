@@ -42,6 +42,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.saveToSystemPhotos))
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.keepOriginalStreams))
         XCTAssertEqual(userDefaults.string(forKey: SettingsKey.workNamingRule), WorkNamingRule.dateLayout.rawValue)
+        XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.workNamingSequence), 1)
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.autoClearCache))
     }
 
@@ -94,6 +95,57 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(LivePhotoDurationOption.from(seconds: 5.0), .extended)
         XCTAssertEqual(LivePhotoDurationOption.from(seconds: -100), .short)
         XCTAssertEqual(LivePhotoDurationOption.from(seconds: 4.4), .extended)
+    }
+
+    func testWorkNamingRuleFormatsTitlesAndConsumesSequence() {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.year = 2026
+        components.month = 5
+        components.day = 20
+        components.hour = 9
+        components.minute = 8
+        let date = components.date!
+
+        userDefaults.set(7, forKey: SettingsKey.workNamingSequence)
+
+        XCTAssertEqual(
+            WorkNamingRule.dateLayout.title(for: date, layout: LayoutType.pictureInPicture.rawValue, userDefaults: userDefaults),
+            "2026-05-20 09:08 · \(LayoutType.pictureInPicture.localizedTitle)"
+        )
+        XCTAssertEqual(WorkNamingRule.dateOnly.title(for: date, layout: LayoutType.pictureInPicture.rawValue, userDefaults: userDefaults), "2026-05-20 09:08")
+        XCTAssertEqual(WorkNamingRule.sequence.title(for: date, layout: LayoutType.pictureInPicture.rawValue, userDefaults: userDefaults), "DualCam 0007")
+        XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.workNamingSequence), 8)
+    }
+
+    func testWorkNamingRuleFormatsFileStemFromCurrentSequence() {
+        userDefaults.set(12, forKey: SettingsKey.workNamingSequence)
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.year = 2026
+        components.month = 5
+        components.day = 20
+        components.hour = 9
+        components.minute = 8
+        components.second = 7
+        let date = components.date!
+
+        let dateLayoutStem = WorkNamingRule.dateLayout.fileNameStem(
+            for: date,
+            layout: LayoutType.pictureInPicture.rawValue,
+            prefix: "photo",
+            userDefaults: userDefaults
+        )
+        let sequenceStem = WorkNamingRule.sequence.fileNameStem(
+            for: date,
+            layout: LayoutType.pictureInPicture.rawValue,
+            prefix: "live",
+            userDefaults: userDefaults
+        )
+
+        XCTAssertTrue(dateLayoutStem.hasPrefix("dual_camera_photo_20260520_090807_\(LayoutType.pictureInPicture.rawValue)_"))
+        XCTAssertTrue(sequenceStem.hasPrefix("dual_camera_live_0012_"))
+        XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.workNamingSequence), 12)
     }
 
     func testRearFocalCapabilityFiltersPrototypeZoomsToSupportedRange() {

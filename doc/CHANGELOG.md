@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-05-20 - Work naming rule activation
+
+### Fixed
+
+- Connected the Work Naming Rule setting to new Works titles and local capture file names.
+- Added sequence numbering persistence so the Sequence naming rule advances for each new saved work.
+- Added unit coverage for Work Naming Rule defaults, formatted titles, file-name stems, and sequence behavior.
+
+### Verified
+
+- `xcodebuild test -project code/DualCamApp.xcodeproj -scheme DualCamApp -destination 'platform=iOS Simulator,name=iPhone 17'` completed successfully with 55 passing tests.
+
 ## 2026-05-18 - iPad front camera compatibility
 
 ### Fixed

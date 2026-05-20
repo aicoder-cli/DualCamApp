@@ -235,6 +235,7 @@ final class WorksManager: ObservableObject {
     @Published var statusMessage: String?
 
     private let fileManager: FileManager
+    private let userDefaults: UserDefaults
     private let indexURL: URL
     private let thumbnailsDirectory: URL
     private let documentsDirectory: URL
@@ -242,8 +243,9 @@ final class WorksManager: ObservableObject {
 
     var latestWork: WorkItem? { items.first }
 
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, userDefaults: UserDefaults = .standard) {
         self.fileManager = fileManager
+        self.userDefaults = userDefaults
         documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let supportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DualCamApp", isDirectory: true)
@@ -591,6 +593,10 @@ final class WorksManager: ObservableObject {
         }
     }
 
+    private var currentWorkNamingRule: WorkNamingRule {
+        WorkNamingRule.from(userDefaults.string(forKey: SettingsKey.workNamingRule) ?? WorkNamingRule.dateLayout.rawValue)
+    }
+
     private func assetPath(for url: URL) -> String {
         url.standardizedFileURL.path
     }
@@ -604,7 +610,7 @@ final class WorksManager: ObservableObject {
 
     private func makeWorkItem(from draft: RecordedWorkDraft) throws -> WorkItem {
         let thumbnailURL = try? makeThumbnail(for: draft)
-        let titleKey = draft.kind == .video ? "works.defaultTitle.video" : (draft.isLivePhoto ? "works.defaultTitle.livePhoto" : "works.defaultTitle.photo")
+        let title = currentWorkNamingRule.title(for: draft.createdAt, layout: draft.layout, userDefaults: userDefaults)
         let metadata = WorkCameraMetadata(
             resolution: "\(Int(draft.resolution.width))×\(Int(draft.resolution.height))",
             frameRate: draft.frameRate,
@@ -613,7 +619,7 @@ final class WorksManager: ObservableObject {
         return WorkItem(
             id: UUID(),
             kind: draft.kind,
-            title: L10n.string(titleKey),
+            title: title,
             createdAt: draft.createdAt,
             duration: draft.duration,
             layout: draft.layout,

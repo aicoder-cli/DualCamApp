@@ -21,6 +21,7 @@ enum SettingsKey {
     static let saveToSystemPhotos = "saveToSystemPhotos"
     static let keepOriginalStreams = "keepOriginalStreams"
     static let workNamingRule = "workNamingRule"
+    static let workNamingSequence = "workNamingSequence"
     static let autoClearCache = "autoClearCache"
 }
 
@@ -56,6 +57,7 @@ enum AppSettings {
             SettingsKey.saveToSystemPhotos: false,
             SettingsKey.keepOriginalStreams: false,
             SettingsKey.workNamingRule: WorkNamingRule.dateLayout.rawValue,
+            SettingsKey.workNamingSequence: 1,
             SettingsKey.autoClearCache: false
         ])
     }
@@ -315,7 +317,60 @@ enum WorkNamingRule: String, CaseIterable, Identifiable {
         }
     }
 
+    func title(for date: Date, layout: String, userDefaults: UserDefaults = .standard) -> String {
+        switch self {
+        case .dateLayout:
+            return "\(Self.titleDateFormatter.string(from: date)) · \(Self.localizedLayoutTitle(for: layout))"
+        case .dateOnly:
+            return Self.titleDateFormatter.string(from: date)
+        case .sequence:
+            let sequence = Self.nextSequenceNumber(userDefaults: userDefaults)
+            userDefaults.set(sequence + 1, forKey: SettingsKey.workNamingSequence)
+            return String(format: "DualCam %04d", sequence)
+        }
+    }
+
+    func fileNameStem(for date: Date = Date(), layout: String, prefix: String? = nil, userDefaults: UserDefaults = .standard) -> String {
+        let base: String
+        switch self {
+        case .dateLayout:
+            base = "\(Self.fileDateFormatter.string(from: date))_\(Self.safeFileComponent(layout))"
+        case .dateOnly:
+            base = Self.fileDateFormatter.string(from: date)
+        case .sequence:
+            base = String(format: "%04d", Self.nextSequenceNumber(userDefaults: userDefaults))
+        }
+        let namePrefix = (["dual_camera", prefix].compactMap { $0 }).joined(separator: "_")
+        return "\(namePrefix)_\(base)_\(UUID().uuidString)"
+    }
+
     static func from(_ rawValue: String) -> WorkNamingRule {
         WorkNamingRule(rawValue: rawValue) ?? .dateLayout
     }
+
+    private static func nextSequenceNumber(userDefaults: UserDefaults) -> Int {
+        max(1, userDefaults.integer(forKey: SettingsKey.workNamingSequence))
+    }
+
+    private static func localizedLayoutTitle(for rawValue: String) -> String {
+        LayoutType(rawValue: rawValue)?.localizedTitle ?? rawValue
+    }
+
+    private static func safeFileComponent(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        let scalars = value.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" }
+        return String(scalars).trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+    }
+
+    private static let titleDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
+
+    private static let fileDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return formatter
+    }()
 }
