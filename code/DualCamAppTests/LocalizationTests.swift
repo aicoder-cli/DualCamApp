@@ -2,44 +2,63 @@ import XCTest
 @testable import DualCamApp
 
 final class LocalizationTests: XCTestCase {
-    private let localizableEN = "DualCamApp/Resources/en.lproj/Localizable.strings"
-    private let localizableZH = "DualCamApp/Resources/zh-Hans.lproj/Localizable.strings"
-    private let infoPlistEN = "DualCamApp/Resources/en.lproj/InfoPlist.strings"
-    private let infoPlistZH = "DualCamApp/Resources/zh-Hans.lproj/InfoPlist.strings"
+    private let localizableFiles = [
+        "en": "DualCamApp/Resources/en.lproj/Localizable.strings",
+        "zh-Hans": "DualCamApp/Resources/zh-Hans.lproj/Localizable.strings",
+        "zh-Hant": "DualCamApp/Resources/zh-Hant.lproj/Localizable.strings",
+        "ko": "DualCamApp/Resources/ko.lproj/Localizable.strings"
+    ]
+    private let infoPlistFiles = [
+        "en": "DualCamApp/Resources/en.lproj/InfoPlist.strings",
+        "zh-Hans": "DualCamApp/Resources/zh-Hans.lproj/InfoPlist.strings",
+        "zh-Hant": "DualCamApp/Resources/zh-Hant.lproj/InfoPlist.strings",
+        "ko": "DualCamApp/Resources/ko.lproj/InfoPlist.strings"
+    ]
 
-    func testLocalizableKeySetsMatchBetweenEnglishAndSimplifiedChinese() throws {
-        let english = try StringsFile.load(localizableEN)
-        let simplifiedChinese = try StringsFile.load(localizableZH)
+    func testLocalizableKeySetsMatchEnglish() throws {
+        let english = try StringsFile.load(localizableFiles["en"]!)
 
-        XCTAssertEqual(Set(english.keys), Set(simplifiedChinese.keys))
+        for (language, path) in localizableFiles where language != "en" {
+            let localized = try StringsFile.load(path)
+
+            XCTAssertEqual(Set(english.keys), Set(localized.keys), "Mismatched Localizable.strings keys for \(language)")
+        }
     }
 
-    func testInfoPlistKeySetsMatchBetweenEnglishAndSimplifiedChinese() throws {
-        let english = try StringsFile.load(infoPlistEN)
-        let simplifiedChinese = try StringsFile.load(infoPlistZH)
+    func testInfoPlistKeySetsMatchEnglish() throws {
+        let english = try StringsFile.load(infoPlistFiles["en"]!)
 
-        XCTAssertEqual(Set(english.keys), Set(simplifiedChinese.keys))
+        for (language, path) in infoPlistFiles where language != "en" {
+            let localized = try StringsFile.load(path)
+
+            XCTAssertEqual(Set(english.keys), Set(localized.keys), "Mismatched InfoPlist.strings keys for \(language)")
+        }
     }
 
-    func testFormatPlaceholdersMatchBetweenEnglishAndSimplifiedChinese() throws {
-        let english = try StringsFile.load(localizableEN)
-        let simplifiedChinese = try StringsFile.load(localizableZH)
+    func testFormatPlaceholdersMatchEnglish() throws {
+        let english = try StringsFile.load(localizableFiles["en"]!)
 
-        for key in Set(english.keys).intersection(simplifiedChinese.keys).sorted() {
-            XCTAssertEqual(
-                StringsFile.placeholderTypes(in: english[key] ?? ""),
-                StringsFile.placeholderTypes(in: simplifiedChinese[key] ?? ""),
-                "Mismatched placeholders for key \(key)"
-            )
+        for (language, path) in localizableFiles where language != "en" {
+            let localized = try StringsFile.load(path)
+
+            for key in Set(english.keys).intersection(localized.keys).sorted() {
+                XCTAssertEqual(
+                    StringsFile.placeholderTypes(in: english[key] ?? ""),
+                    StringsFile.placeholderTypes(in: localized[key] ?? ""),
+                    "Mismatched placeholders for key \(key) in \(language)"
+                )
+            }
         }
     }
 
     func testEnumLocalizationKeysExist() throws {
-        let keys = Set(try StringsFile.load(localizableEN).keys)
+        let keys = Set(try StringsFile.load(localizableFiles["en"]!).keys)
         let requiredKeys = Set([
             "language.system",
             "language.english",
             "language.simplifiedChinese",
+            "language.traditionalChinese",
+            "language.korean",
             "shape.square",
             "shape.rounded",
             "shape.circle",
@@ -85,6 +104,13 @@ final class LocalizationTests: XCTestCase {
         })
 
         XCTAssertTrue(requiredKeys.isSubset(of: keys), "Missing keys: \(requiredKeys.subtracting(keys).sorted())")
+    }
+
+    func testEachSelectableAppLanguageHasLocalizableResources() {
+        let availableLanguages = Set(localizableFiles.keys)
+        let selectableLanguages = Set(AppLanguage.allCases.filter { $0 != .system }.map(\.rawValue))
+
+        XCTAssertEqual(selectableLanguages, availableLanguages)
     }
 
     func testMissingLocalizationKeyFallsBackToKey() {

@@ -1,6 +1,8 @@
 "language.system" = "跟随系统";
 "language.english" = "English";
 "language.simplifiedChinese" = "简体中文";
+"language.traditionalChinese" = "繁体中文";
+"language.korean" = "韩语";
 
 "capture.photo" = "照片";
 "capture.video" = "视频";

@@ -63,9 +63,13 @@
 		A1222222000000000000000B /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		A1222222000000000000000C /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A1222222000000000000000D /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+			A1222222000000000000002B /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
+			A1222222000000000000002C /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A1222222000000000000000F /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A12222220000000000000010 /* LivePhotoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoRecorder.swift; sourceTree = "<group>"; };
 		A12222220000000000000011 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+			A1222222000000000000002D /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+			A1222222000000000000002E /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A12222220000000000000013 /* WorksManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksManager.swift; sourceTree = "<group>"; };
 		A12222220000000000000014 /* WorksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksView.swift; sourceTree = "<group>"; };
 		A12222220000000000000015 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
@@ -263,6 +267,8 @@
 				en,
 				Base,
 				"zh-Hans",
+				"zh-Hant",
+				ko,
 			);
 			mainGroup = A14444440000000000000001;
 			productRefGroup = A14444440000000000000003 /* Products */;
@@ -351,6 +357,8 @@
 			children = (
 				A1222222000000000000000C /* en */,
 				A1222222000000000000000D /* zh-Hans */,
+				A1222222000000000000002B /* zh-Hant */,
+				A1222222000000000000002C /* ko */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
@@ -360,6 +368,8 @@
 			children = (
 				A1222222000000000000000F /* en */,
 				A12222220000000000000011 /* zh-Hans */,
+				A1222222000000000000002D /* zh-Hant */,
+				A1222222000000000000002E /* ko */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";

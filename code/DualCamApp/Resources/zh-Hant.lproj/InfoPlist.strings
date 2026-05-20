@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "DualCam 需要相機存取權限，才能同時預覽和錄製前後相機。";
+"NSMicrophoneUsageDescription" = "DualCam 需要麥克風存取權限，才能錄製影片聲音。";
+"NSPhotoLibraryAddUsageDescription" = "DualCam 需要權限，才能將照片、Live Photo 和影片儲存到你的照片圖庫。";
+"NSPhotoLibraryUsageDescription" = "DualCam 需要照片圖庫存取權限，才能檢視已錄製的影片。";

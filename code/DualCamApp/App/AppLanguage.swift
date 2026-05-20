@@ -5,6 +5,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case system
     case english = "en"
     case simplifiedChinese = "zh-Hans"
+    case traditionalChinese = "zh-Hant"
+    case korean = "ko"
 
     var id: String { rawValue }
 
@@ -12,7 +14,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .system:
             return .autoupdatingCurrent
-        case .english, .simplifiedChinese:
+        case .english, .simplifiedChinese, .traditionalChinese, .korean:
             return Locale(identifier: rawValue)
         }
     }
@@ -25,6 +27,10 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             return "language.english"
         case .simplifiedChinese:
             return "language.simplifiedChinese"
+        case .traditionalChinese:
+            return "language.traditionalChinese"
+        case .korean:
+            return "language.korean"
         }
     }
 

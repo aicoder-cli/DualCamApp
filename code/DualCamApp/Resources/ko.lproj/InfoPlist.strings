@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "DualCam은 두 카메라로 미리보고 녹화하기 위해 카메라 접근 권한이 필요합니다.";
+"NSMicrophoneUsageDescription" = "DualCam은 동영상 오디오를 녹음하기 위해 마이크 접근 권한이 필요합니다.";
+"NSPhotoLibraryAddUsageDescription" = "DualCam은 사진, Live Photo, 동영상을 사진 보관함에 저장하기 위해 권한이 필요합니다.";
+"NSPhotoLibraryUsageDescription" = "DualCam은 녹화된 동영상을 보기 위해 사진 보관함 접근 권한이 필요합니다.";

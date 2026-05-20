@@ -62,6 +62,8 @@ final class AppSettingsTests: XCTestCase {
     }
 
     func testEnumFallbacksForUnknownValues() {
+        XCTAssertEqual(AppLanguage.from("zh-Hant"), .traditionalChinese)
+        XCTAssertEqual(AppLanguage.from("ko"), .korean)
         XCTAssertEqual(AppLanguage.from("bad"), .system)
         XCTAssertEqual(DefaultCaptureMode.from("bad"), .video)
         XCTAssertEqual(LayoutType.from("bad"), .pictureInPicture)

@@ -1,6 +1,8 @@
 "language.system" = "Follow System";
 "language.english" = "English";
 "language.simplifiedChinese" = "Simplified Chinese";
+"language.traditionalChinese" = "Traditional Chinese";
+"language.korean" = "Korean";
 
 "capture.photo" = "Photo";
 "capture.video" = "Video";
