@@ -250,9 +250,9 @@ struct SettingsView: View {
 }
 
 private enum SettingsURL {
-    static let feedback = URL(string: "https://dualcam.pages.dev/feedback")!
-    static let privacy = URL(string: "https://dualcam.pages.dev/privacy")!
-    static let terms = URL(string: "https://dualcam.pages.dev/terms")!
+    static let feedback = URL(string: "https://dualcam.pages.dev/App/feedback/")!
+    static let privacy = URL(string: "https://dualcam.pages.dev/App/privacy/")!
+    static let terms = URL(string: "https://dualcam.pages.dev/App/terms/")!
 }
 
 private enum SettingsPalette {

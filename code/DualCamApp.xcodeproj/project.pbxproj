@@ -34,6 +34,7 @@
 		A11111110000000000000117 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000008 /* Assets.xcassets */; };
 		A11111110000000000000118 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000E /* Localizable.strings */; };
 		A11111110000000000000119 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000012 /* InfoPlist.strings */; };
+		A1111111000000000000011A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000002A /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +58,7 @@
 		A12222220000000000000007 /* LayoutSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutSelectorView.swift; sourceTree = "<group>"; };
 		A12222220000000000000008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A12222220000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1222222000000000000002A /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A1222222000000000000000A /* QuickStartOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickStartOnboardingView.swift; sourceTree = "<group>"; };
 		A1222222000000000000000B /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		A1222222000000000000000C /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -172,6 +174,7 @@
 			isa = PBXGroup;
 			children = (
 				A12222220000000000000008 /* Assets.xcassets */,
+				A1222222000000000000002A /* LaunchScreen.storyboard */,
 				A1222222000000000000000E /* Localizable.strings */,
 				A12222220000000000000012 /* InfoPlist.strings */,
 			);
@@ -278,6 +281,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A11111110000000000000117 /* Assets.xcassets in Resources */,
+				A1111111000000000000011A /* LaunchScreen.storyboard in Resources */,
 				A11111110000000000000118 /* Localizable.strings in Resources */,
 				A11111110000000000000119 /* InfoPlist.strings in Resources */,
 			);
@@ -376,7 +380,7 @@
 				INFOPLIST_FILE = DualCamApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
@@ -414,7 +418,7 @@
 				INFOPLIST_FILE = DualCamApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;

@@ -1,7 +1,91 @@
 import SwiftUI
 
+struct LaunchIntroView: View {
+    let onComplete: () -> Void
+    @State private var markOpacity = 0.0
+    @State private var markScale = 0.88
+    @State private var slashOffset: CGFloat = -150
+    @State private var slashOpacity = 0.0
+    @State private var titleOpacity = 0.0
+    @State private var titleOffset: CGFloat = 14
+
+    var body: some View {
+        ZStack {
+            QuickStartDesign.background
+                .ignoresSafeArea()
+
+            RadialGradient(
+                colors: [QuickStartDesign.accent.opacity(0.24), .clear],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 360
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                ZStack {
+                    Text("DC")
+                        .font(.system(size: 72, weight: .black, design: .rounded))
+                        .kerning(-6)
+                        .foregroundColor(QuickStartDesign.accent)
+                        .scaleEffect(markScale)
+                        .opacity(markOpacity)
+
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(QuickStartDesign.accent)
+                        .frame(width: 7, height: 160)
+                        .rotationEffect(.degrees(14))
+                        .shadow(color: QuickStartDesign.accent.opacity(0.38), radius: 18, x: 0, y: 0)
+                        .offset(x: slashOffset)
+                        .opacity(slashOpacity)
+                }
+                .frame(width: 190, height: 160)
+
+                VStack(spacing: 8) {
+                    Text("DualCam")
+                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .kerning(-1.6)
+                        .foregroundColor(.white)
+
+                    Text("onboarding.hero.subtitle")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(QuickStartDesign.mutedText)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+                .opacity(titleOpacity)
+                .offset(y: titleOffset)
+                .padding(.horizontal, 36)
+            }
+        }
+        .preferredColorScheme(.dark)
+        .onAppear(perform: runAnimation)
+    }
+
+    private func runAnimation() {
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+            markOpacity = 1
+            markScale = 1
+        }
+        withAnimation(.easeOut(duration: 0.58).delay(0.24)) {
+            slashOffset = 0
+            slashOpacity = 1
+        }
+        withAnimation(.easeOut(duration: 0.42).delay(0.62)) {
+            titleOpacity = 1
+            titleOffset = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.35) {
+            withAnimation(.easeInOut(duration: 0.28)) {
+                onComplete()
+            }
+        }
+    }
+}
+
 struct QuickStartOnboardingView: View {
     let onComplete: () -> Void
+    @State private var isShowingLaunchIntro = true
 
     private let cards: [QuickStartCard] = [
         QuickStartCard(
@@ -80,7 +164,16 @@ struct QuickStartOnboardingView: View {
                 .padding(.top, 76)
                 .padding(.bottom, 36)
             }
+
+            if isShowingLaunchIntro {
+                LaunchIntroView {
+                    isShowingLaunchIntro = false
+                }
+                .transition(.opacity)
+                .zIndex(1)
+            }
         }
+        .animation(.easeInOut(duration: 0.28), value: isShowingLaunchIntro)
         .preferredColorScheme(.dark)
     }
 
