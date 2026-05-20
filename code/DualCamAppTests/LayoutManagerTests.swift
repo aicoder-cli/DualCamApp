@@ -49,7 +49,8 @@ final class LayoutManagerTests: XCTestCase {
         let back = manager.getBackCameraLayout()
 
         TestSupport.assertRect(back.frame, CGRect(x: 0, y: 0, width: 390, height: 844))
-        TestSupport.assertRect(front.frame, CGRect(x: 230.1, y: 464.2, width: 132.6, height: 286.96))
+        TestSupport.assertRect(front.frame, CGRect(x: 230.1, y: 519.28, width: 132.6, height: 176.8))
+        TestSupport.assertCGFloat(front.frame.width / front.frame.height, 3.0 / 4.0)
         XCTAssertEqual(front.clipShape, .roundedRectangle)
         XCTAssertTrue(front.showBorder)
         XCTAssertGreaterThan(front.zIndex, back.zIndex)

@@ -252,7 +252,7 @@ class LayoutManager: ObservableObject {
         let height = containerSize.height
         let clampedSize = min(max(floatingSize, 0.22), 0.56)
         let viewWidth = width * clampedSize
-        let viewHeight = clipShape == .circle ? viewWidth : height * clampedSize
+        let viewHeight = clipShape == .circle ? viewWidth : viewWidth * 4 / 3
         let x = width * floatingHorizontalPosition - viewWidth / 2
         let y = height * floatingVerticalPosition - viewHeight / 2
         let radius = clipShape == .rectangle ? 0 : 24
