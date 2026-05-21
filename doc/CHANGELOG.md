@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-20 - Launch intro and capture polish
+
+### Added
+
+- Added automatic cache cleanup for DualCam temporary native capture files and orphaned Works thumbnails when Auto-clear Cache is enabled and recording is idle.
+- Added a pure-background storyboard launch screen and a first-run SwiftUI DC intro overlay before the onboarding copy.
+
+### Changed
+
+- Changed the picture-in-picture floating window to a 3:4 rounded-rectangle ratio.
+- Lowered the home capture frame to better align with the layout toolbar area.
+- Updated Terms of Use, Privacy Policy, and User Feedback links to the `/App/.../` pages.
+
+### Verified
+
+- `xcodebuild test -project code/DualCamApp.xcodeproj -scheme DualCamApp -destination 'id=56903F69-4781-4E53-A9FD-D17BF33A2B65'` completed successfully.
+
 ## 2026-05-20 - Work naming rule activation
 
 ### Fixed
