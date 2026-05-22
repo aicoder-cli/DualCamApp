@@ -1,7 +1,7 @@
 # DualCam 双摄录像
 
 <p align="center">
-  <img src="promo-preview.gif" width="320" alt="DualCam promo preview">
+  <img src="doc/promo-preview.gif" width="320" alt="DualCam promo preview">
 </p>
 
 <p align="center">
@@ -22,14 +22,14 @@
 ## 视觉预览
 
 <p align="center">
-  <img src="assets/appstore-zh-01.png" width="220" alt="DualCam App Store preview 1">
-  <img src="assets/appstore-zh-03.png" width="220" alt="DualCam App Store preview 2">
-  <img src="assets/appstore-zh-06.png" width="220" alt="DualCam App Store preview 3">
+  <img src="doc/assets/appstore-zh-01.png" width="220" alt="DualCam App Store preview 1">
+  <img src="doc/assets/appstore-zh-03.png" width="220" alt="DualCam App Store preview 2">
+  <img src="doc/assets/appstore-zh-06.png" width="220" alt="DualCam App Store preview 3">
 </p>
 
-- 交互原型：[`prototype.html`](prototype.html)
-- 推荐视频源文件：[`promo-video.html`](promo-video.html)
-- 操作说明：[`使用指南.md`](使用指南.md)
+- 交互原型：[`prototype.html`](doc/prototype.html)
+- 推荐视频源文件：[`promo-video.html`](doc/promo-video.html)
+- 操作说明：[`使用指南.md`](doc/使用指南.md)
 
 ## 快速开始
 
@@ -112,7 +112,7 @@ code/
 
 ## 本地文档资产
 
-当前文档包复用了项目内已有设计资产，并集中复制到 `doc/assets/`：
+当前文档包复用了项目内已有设计资产，并集中复制到 [`doc/assets/`](doc/assets/)：
 
 - Split Capture app icon
 - App Store 中文预览图
