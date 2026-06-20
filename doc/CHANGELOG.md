@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-20 - Works video detail cover preview
+
+### Fixed
+
+- Fixed video Works detail pages showing a black preview before playback starts by displaying the generated thumbnail as the initial cover.
+- Matched the cover and playback preview fill behavior so the video frame does not jump when playback starts.
+- Kept the detail preview play button in the same lower-right position before playback, during playback, and after playback completes.
+- Reset inline video playback to the initial cover and play-button state when the video finishes.
+- Generated new video thumbnails from a stable early frame instead of always using the first frame.
+
+### Verified
+
+- Real-device Works detail playback was confirmed after the preview-position fix.
+- `xcodebuild test -project code/DualCamApp.xcodeproj -scheme DualCamApp -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5'` completed successfully with 56 passing tests.
+
 ## 2026-05-20 - Launch intro and capture polish
 
 ### Added
