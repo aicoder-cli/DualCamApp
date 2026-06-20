@@ -684,7 +684,7 @@ final class WorksManager: ObservableObject {
             let asset = AVAsset(url: draft.assetURL)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
-            let cgImage = try generator.copyCGImage(at: .zero, actualTime: nil)
+            let cgImage = try generator.copyCGImage(at: thumbnailFrameTime(for: asset), actualTime: nil)
             image = UIImage(cgImage: cgImage)
         }
 
@@ -694,6 +694,17 @@ final class WorksManager: ObservableObject {
         let thumbnailURL = thumbnailsDirectory.appendingPathComponent("\(UUID().uuidString).jpg")
         try data.write(to: thumbnailURL, options: .atomic)
         return thumbnailURL
+    }
+
+    private func thumbnailFrameTime(for asset: AVAsset) -> CMTime {
+        let durationSeconds = CMTimeGetSeconds(asset.duration)
+        guard durationSeconds.isFinite, durationSeconds > 0 else {
+            return CMTime(seconds: 0.2, preferredTimescale: 600)
+        }
+
+        let upperBound = max(durationSeconds - 0.05, 0)
+        let seconds = min(max(durationSeconds * 0.1, 0.2), upperBound)
+        return CMTime(seconds: seconds, preferredTimescale: 600)
     }
 
     private func fileDate(for url: URL) -> Date {

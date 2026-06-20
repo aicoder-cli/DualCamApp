@@ -1059,9 +1059,21 @@ private struct LivePhotoView: UIViewRepresentable {
 private final class InlineVideoPlayerModel: ObservableObject {
     let player: AVPlayer
     @Published private(set) var isPlaying = false
+    @Published private(set) var playbackCompletionCount = 0
+    private var playbackEndedObserver: NSObjectProtocol?
 
     init(url: URL) {
-        player = AVPlayer(url: url)
+        let item = AVPlayerItem(url: url)
+        player = AVPlayer(playerItem: item)
+        playbackEndedObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.finishPlayback()
+            }
+        }
     }
 
     func togglePlayback() {
@@ -1078,14 +1090,52 @@ private final class InlineVideoPlayerModel: ObservableObject {
         isPlaying = false
     }
 
-    deinit {
+    private func finishPlayback() {
         player.pause()
+        player.seek(to: .zero)
+        isPlaying = false
+        playbackCompletionCount += 1
+    }
+
+    deinit {
+        if let playbackEndedObserver {
+            NotificationCenter.default.removeObserver(playbackEndedObserver)
+        }
+        player.pause()
+    }
+}
+
+private struct InlineAVPlayerView: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> PlayerContainerView {
+        let view = PlayerContainerView()
+        view.backgroundColor = .black
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspectFill
+        return view
+    }
+
+    func updateUIView(_ view: PlayerContainerView, context: Context) {
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspectFill
+    }
+}
+
+private final class PlayerContainerView: UIView {
+    override class var layerClass: AnyClass {
+        AVPlayerLayer.self
+    }
+
+    var playerLayer: AVPlayerLayer {
+        layer as! AVPlayerLayer
     }
 }
 
 private struct InlineVideoPreview: View {
     let item: WorkItem
     let isActive: Bool
+    @State private var hasStartedPlayback = false
     @StateObject private var playerModel: InlineVideoPlayerModel
 
     init(item: WorkItem, isActive: Bool) {
@@ -1095,35 +1145,62 @@ private struct InlineVideoPreview: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            if FileManager.default.fileExists(atPath: item.assetURL.path) {
-                VideoPlayer(player: playerModel.player)
-                    .background(Color.black)
-            } else {
-                WorkThumbnail(url: item.thumbnailURL)
-            }
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                if hasVideoFile {
+                    InlineAVPlayerView(player: playerModel.player)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .background(Color.black)
 
-            Button(action: playerModel.togglePlayback) {
-                Image(systemName: playerModel.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 17, weight: .black))
-                    .foregroundColor(.black)
-                    .frame(width: 48, height: 48)
-                    .background(Circle().fill(WorksDesign.accent))
-                    .overlay(Circle().stroke(Color.black.opacity(0.18), lineWidth: 1))
-                    .shadow(color: Color.black.opacity(0.24), radius: 12, x: 0, y: 6)
+                    if !hasStartedPlayback {
+                        WorkThumbnail(url: item.thumbnailURL)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
+                } else {
+                    WorkThumbnail(url: item.thumbnailURL)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                }
+
+                Button(action: togglePlayback) {
+                    Image(systemName: playerModel.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 17, weight: .black))
+                        .foregroundColor(.black)
+                        .frame(width: 48, height: 48)
+                        .background(Circle().fill(WorksDesign.accent))
+                        .overlay(Circle().stroke(Color.black.opacity(0.18), lineWidth: 1))
+                        .shadow(color: Color.black.opacity(0.24), radius: 12, x: 0, y: 6)
+                }
+                .disabled(!hasVideoFile)
+                .opacity(hasVideoFile ? 1 : 0.45)
+                .position(
+                    x: max(24, geometry.size.width - 42),
+                    y: max(24, geometry.size.height - 42)
+                )
             }
-            .padding(18)
-            .disabled(!FileManager.default.fileExists(atPath: item.assetURL.path))
-            .opacity(FileManager.default.fileExists(atPath: item.assetURL.path) ? 1 : 0.45)
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .onChange(of: isActive) { active in
             if !active {
                 playerModel.pause()
             }
         }
+        .onChange(of: playerModel.playbackCompletionCount) { _ in
+            hasStartedPlayback = false
+        }
         .onDisappear {
             playerModel.pause()
         }
+    }
+
+    private var hasVideoFile: Bool {
+        FileManager.default.fileExists(atPath: item.assetURL.path)
+    }
+
+    private func togglePlayback() {
+        if !playerModel.isPlaying {
+            hasStartedPlayback = true
+        }
+        playerModel.togglePlayback()
     }
 }
 
