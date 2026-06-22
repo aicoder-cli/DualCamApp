@@ -94,6 +94,11 @@ class VideoRecorder: ObservableObject {
         let presentationTime: CMTime?
     }
 
+    private enum LayerContentMode {
+        case aspectFill
+        case aspectFit
+    }
+
     private struct LivePhotoBufferedFrame {
         let pixelBuffer: CVPixelBuffer
         let presentationTime: CMTime
@@ -659,22 +664,22 @@ class VideoRecorder: ObservableObject {
         recordingState = .saving
 
         do {
-            let photoURL = try await makeNativePhotoFile(frontData: frontData, backData: backData, layoutSnapshot: layoutSnapshot)
+            let capture = try await makeNativePhotoFile(frontData: frontData, backData: backData, layoutSnapshot: layoutSnapshot)
             workCompletedHandler?(
                 RecordedWorkDraft(
                     kind: .photo,
-                    assetURL: photoURL,
+                    assetURL: capture.photoURL,
                     pairedVideoURL: nil,
                     createdAt: Date(),
                     duration: nil,
                     layout: latestLayoutIdentifier,
-                    resolution: layoutSnapshot.outputSize,
+                    resolution: capture.outputSize,
                     frameRate: Int(frameRate),
                     isLivePhoto: false
                 )
             )
             if saveToSystemPhotos {
-                await savePhotoToPhotoLibrary(photoURL)
+                await savePhotoToPhotoLibrary(capture.photoURL)
             }
         } catch {
             errorMessage = L10n.string("error.photo.saveFailed", error.localizedDescription)
@@ -792,7 +797,7 @@ class VideoRecorder: ObservableObject {
         resetRecordingState()
     }
 
-    private func makeNativePhotoFile(frontData: Data, backData: Data?, layoutSnapshot: RecordingLayoutSnapshot) async throws -> URL {
+    private func makeNativePhotoFile(frontData: Data, backData: Data?, layoutSnapshot: RecordingLayoutSnapshot) async throws -> (photoURL: URL, outputSize: CGSize) {
         try await withCheckedThrowingContinuation { continuation in
             processingQueue.async { [weak self] in
                 guard let self else {
@@ -806,9 +811,10 @@ class VideoRecorder: ObservableObject {
                         return
                     }
                     let backImage = backData.flatMap { UIImage(data: $0) }
+                    let outputSnapshot = self.nativePhotoLayoutSnapshot(from: layoutSnapshot, front: frontImage, back: backImage)
 
-                    guard let image = self.composeImages(front: frontImage, back: backImage, layoutSnapshot: layoutSnapshot),
-                          let imageData = image.jpegData(compressionQuality: 0.92) else {
+                    guard let image = self.composeImages(front: frontImage, back: backImage, layoutSnapshot: outputSnapshot),
+                          let imageData = image.jpegData(compressionQuality: 0.96) else {
                         continuation.resume(throwing: NSError(domain: "DualCamApp", code: -22, userInfo: [NSLocalizedDescriptionKey: L10n.string("error.photo.compositionFailed")]))
                         return
                     }
@@ -816,7 +822,7 @@ class VideoRecorder: ObservableObject {
                     do {
                         let photoURL = self.makePhotoOutputURL()
                         try imageData.write(to: photoURL, options: .atomic)
-                        continuation.resume(returning: photoURL)
+                        continuation.resume(returning: (photoURL: photoURL, outputSize: outputSnapshot.outputSize))
                     } catch {
                         continuation.resume(throwing: error)
                     }
@@ -1599,12 +1605,12 @@ class VideoRecorder: ObservableObject {
         if let backBuffer,
            let backImage = sourceCGImage(from: backBuffer) {
             let layers = [
-                (image: backImage, layout: layoutSnapshot.back),
-                (image: frontImage, layout: layoutSnapshot.front)
+                (image: backImage, layout: outputVisibleLayout(layoutSnapshot.back, outputSize: outputSize), contentMode: LayerContentMode.aspectFit),
+                (image: frontImage, layout: layoutSnapshot.front, contentMode: .aspectFill)
             ].sorted { $0.layout.zIndex < $1.layout.zIndex }
 
             for layer in layers {
-                draw(layer.image, sourceSize: CGSize(width: layer.image.width, height: layer.image.height), layout: layer.layout, in: context)
+                draw(layer.image, sourceSize: CGSize(width: layer.image.width, height: layer.image.height), layout: layer.layout, contentMode: layer.contentMode, in: context)
             }
         } else {
             let fullFrameLayout = CameraLayoutInfo(
@@ -1700,12 +1706,12 @@ class VideoRecorder: ObservableObject {
         }
     }
 
-    private func draw(_ image: CGImage, sourceSize: CGSize, layout: CameraLayoutInfo, in context: CGContext) {
+    private func draw(_ image: CGImage, sourceSize: CGSize, layout: CameraLayoutInfo, contentMode: LayerContentMode = .aspectFill, in context: CGContext) {
         context.saveGState()
         defer { context.restoreGState() }
 
         clip(layout, in: context)
-        let drawRect = aspectFillRect(for: sourceSize, in: layout.frame)
+        let drawRect = aspectRect(for: sourceSize, in: layout.frame, contentMode: contentMode)
         context.translateBy(x: drawRect.minX, y: drawRect.maxY)
         context.scaleBy(x: 1, y: -1)
         context.draw(image, in: CGRect(origin: .zero, size: drawRect.size))
@@ -1722,6 +1728,50 @@ class VideoRecorder: ObservableObject {
         return composeImages(front: front, back: back, layoutSnapshot: layoutSnapshot)
     }
 
+    private func nativePhotoLayoutSnapshot(from layoutSnapshot: RecordingLayoutSnapshot, front: UIImage, back: UIImage?) -> RecordingLayoutSnapshot {
+        guard let outputSize = nativePhotoOutputSize(from: back ?? front, matching: layoutSnapshot.outputSize) else {
+            return layoutSnapshot
+        }
+        guard outputSize != layoutSnapshot.outputSize else { return layoutSnapshot }
+
+        let scaleX = outputSize.width / layoutSnapshot.outputSize.width
+        let scaleY = outputSize.height / layoutSnapshot.outputSize.height
+        return RecordingLayoutSnapshot(
+            front: scaledLayout(layoutSnapshot.front, scaleX: scaleX, scaleY: scaleY),
+            back: scaledLayout(layoutSnapshot.back, scaleX: scaleX, scaleY: scaleY),
+            outputSize: outputSize
+        )
+    }
+
+    private func nativePhotoOutputSize(from image: UIImage, matching referenceSize: CGSize) -> CGSize? {
+        guard referenceSize.width > 0, referenceSize.height > 0 else { return nil }
+        let pixelWidth = CGFloat(image.cgImage?.width ?? Int(image.size.width))
+        let pixelHeight = CGFloat(image.cgImage?.height ?? Int(image.size.height))
+        guard pixelWidth > 0, pixelHeight > 0 else { return nil }
+
+        let longEdge = max(pixelWidth, pixelHeight)
+        let shortEdge = min(pixelWidth, pixelHeight)
+        let referenceIsPortrait = referenceSize.height >= referenceSize.width
+        return referenceIsPortrait
+            ? CGSize(width: shortEdge, height: longEdge)
+            : CGSize(width: longEdge, height: shortEdge)
+    }
+
+    private func scaledLayout(_ layout: CameraLayoutInfo, scaleX: CGFloat, scaleY: CGFloat) -> CameraLayoutInfo {
+        CameraLayoutInfo(
+            frame: CGRect(
+                x: layout.frame.minX * scaleX,
+                y: layout.frame.minY * scaleY,
+                width: layout.frame.width * scaleX,
+                height: layout.frame.height * scaleY
+            ),
+            zIndex: layout.zIndex,
+            cornerRadius: layout.cornerRadius * min(scaleX, scaleY),
+            showBorder: layout.showBorder,
+            clipShape: layout.clipShape
+        )
+    }
+
     private func composeImages(front: UIImage, back: UIImage?, layoutSnapshot: RecordingLayoutSnapshot) -> UIImage? {
         UIGraphicsBeginImageContextWithOptions(layoutSnapshot.outputSize, false, 1.0)
         defer { UIGraphicsEndImageContext() }
@@ -1731,12 +1781,12 @@ class VideoRecorder: ObservableObject {
 
         if let back {
             let layers = [
-                (image: back, layout: layoutSnapshot.back),
-                (image: front, layout: layoutSnapshot.front)
+                (image: back, layout: outputVisibleLayout(layoutSnapshot.back, outputSize: layoutSnapshot.outputSize), contentMode: LayerContentMode.aspectFit),
+                (image: front, layout: layoutSnapshot.front, contentMode: .aspectFill)
             ].sorted { $0.layout.zIndex < $1.layout.zIndex }
 
             for layer in layers {
-                draw(layer.image, layout: layer.layout)
+                draw(layer.image, layout: layer.layout, contentMode: layer.contentMode)
             }
         } else {
             front.draw(in: CGRect(origin: .zero, size: layoutSnapshot.outputSize))
@@ -1745,10 +1795,10 @@ class VideoRecorder: ObservableObject {
         return UIGraphicsGetImageFromCurrentImageContext()
     }
 
-    private func draw(_ image: UIImage, layout: CameraLayoutInfo) {
+    private func draw(_ image: UIImage, layout: CameraLayoutInfo, contentMode: LayerContentMode = .aspectFill) {
         let rect = layout.frame
         guard let context = UIGraphicsGetCurrentContext() else {
-            image.draw(in: rect)
+            image.draw(in: aspectRect(for: image.size, in: rect, contentMode: contentMode))
             return
         }
 
@@ -1777,15 +1827,51 @@ class VideoRecorder: ObservableObject {
             path.addClip()
         }
 
-        let drawRect = aspectFillRect(for: image.size, in: rect)
+        let drawRect = aspectRect(for: image.size, in: rect, contentMode: contentMode)
         image.draw(in: drawRect)
         context.restoreGState()
+    }
+
+    private func outputVisibleLayout(_ layout: CameraLayoutInfo, outputSize: CGSize) -> CameraLayoutInfo {
+        let outputRect = CGRect(origin: .zero, size: outputSize)
+        let visibleFrame = layout.frame.intersection(outputRect)
+        guard !visibleFrame.isNull, visibleFrame.width > 0, visibleFrame.height > 0 else { return layout }
+
+        return CameraLayoutInfo(
+            frame: visibleFrame,
+            zIndex: layout.zIndex,
+            cornerRadius: layout.cornerRadius,
+            showBorder: layout.showBorder,
+            clipShape: layout.clipShape
+        )
+    }
+
+    private func aspectRect(for imageSize: CGSize, in rect: CGRect, contentMode: LayerContentMode) -> CGRect {
+        switch contentMode {
+        case .aspectFill:
+            return aspectFillRect(for: imageSize, in: rect)
+        case .aspectFit:
+            return aspectFitRect(for: imageSize, in: rect)
+        }
     }
 
     private func aspectFillRect(for imageSize: CGSize, in rect: CGRect) -> CGRect {
         guard imageSize.width > 0, imageSize.height > 0 else { return rect }
 
         let scale = max(rect.width / imageSize.width, rect.height / imageSize.height)
+        let size = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        return CGRect(
+            x: rect.midX - size.width / 2,
+            y: rect.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+    }
+
+    private func aspectFitRect(for imageSize: CGSize, in rect: CGRect) -> CGRect {
+        guard imageSize.width > 0, imageSize.height > 0 else { return rect }
+
+        let scale = min(rect.width / imageSize.width, rect.height / imageSize.height)
         let size = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
         return CGRect(
             x: rect.midX - size.width / 2,
