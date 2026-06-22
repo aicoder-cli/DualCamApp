@@ -831,12 +831,12 @@ class CameraManager: NSObject, ObservableObject {
         let photoOutput = AVCapturePhotoOutput()
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
-            photoOutput.maxPhotoQualityPrioritization = .quality
-            if photoOutput.isLivePhotoCaptureSupported {
-                photoOutput.isLivePhotoCaptureEnabled = true
-            }
+            configurePhotoOutput(photoOutput)
             assignNativePhotoOutput(photoOutput, cameraType: cameraType)
             configureVideoConnection(photoOutput.connection(with: .video), cameraType: cameraType)
+            if let device = cameraDevice(for: cameraType) {
+                configurePhotoOutputDimensions(photoOutput, for: device)
+            }
         }
 
         let movieOutput = AVCaptureMovieFileOutput()
@@ -856,6 +856,59 @@ class CameraManager: NSObject, ObservableObject {
         case .back:
             backCamera.photoOutput = output
         }
+    }
+
+    private func cameraDevice(for cameraType: CameraType) -> AVCaptureDevice? {
+        switch cameraType {
+        case .front:
+            return frontCamera.device
+        case .back:
+            return backCamera.device
+        }
+    }
+
+    private func configurePhotoOutput(_ output: AVCapturePhotoOutput) {
+        output.maxPhotoQualityPrioritization = .quality
+        if output.isLivePhotoCaptureSupported {
+            output.isLivePhotoCaptureEnabled = true
+        }
+    }
+
+    private func configurePhotoOutputDimensions(_ output: AVCapturePhotoOutput, for device: AVCaptureDevice) {
+        guard output.connection(with: .video) != nil else { return }
+        if #available(iOS 16.0, *), let dimensions = preferredPhotoDimensions(for: device.activeFormat) {
+            output.maxPhotoDimensions = dimensions
+        } else {
+            output.isHighResolutionCaptureEnabled = true
+        }
+    }
+
+    private func configurePhotoSettings(_ settings: AVCapturePhotoSettings, for output: AVCapturePhotoOutput) {
+        settings.photoQualityPrioritization = .quality
+        if #available(iOS 16.0, *) {
+            let dimensions = output.maxPhotoDimensions
+            if dimensions.width > 0 && dimensions.height > 0 {
+                settings.maxPhotoDimensions = dimensions
+            }
+        } else {
+            settings.isHighResolutionPhotoEnabled = true
+        }
+    }
+
+    @available(iOS 16.0, *)
+    private func preferredPhotoDimensions(for format: AVCaptureDevice.Format) -> CMVideoDimensions? {
+        format.supportedMaxPhotoDimensions.sorted { lhs, rhs in
+            photoDimensionsRank(lhs) < photoDimensionsRank(rhs)
+        }.first
+    }
+
+    private func photoDimensionsRank(_ dimensions: CMVideoDimensions) -> Int {
+        let width = Int(max(dimensions.width, dimensions.height))
+        let height = Int(min(dimensions.width, dimensions.height))
+        let pixels = width * height
+        let aspectRatio = Double(width) / Double(height)
+        let isFourByThree = abs(aspectRatio - 4.0 / 3.0) < 0.02
+        return (isFourByThree ? 0 : 100_000_000) - pixels
     }
 
     private func assignNativeMovieOutput(_ output: AVCaptureMovieFileOutput, cameraType: CameraType) {
@@ -894,7 +947,7 @@ class CameraManager: NSObject, ObservableObject {
 
     private func captureNativePhotoData(from output: AVCapturePhotoOutput) async throws -> Data {
         let settings = AVCapturePhotoSettings()
-        settings.photoQualityPrioritization = .quality
+        configurePhotoSettings(settings, for: output)
 
         let id = UUID()
         return try await withCheckedThrowingContinuation { continuation in
@@ -928,7 +981,7 @@ class CameraManager: NSObject, ObservableObject {
 
     private func captureNativeLivePhoto(from output: AVCapturePhotoOutput, cameraType: CameraType) async throws -> NativeLivePhotoCapture {
         let settings = AVCapturePhotoSettings()
-        settings.photoQualityPrioritization = .quality
+        configurePhotoSettings(settings, for: output)
         let movieURL = makeNativeLivePhotoTemporaryURL(cameraType: cameraType)
         removeExistingFile(at: movieURL)
         settings.livePhotoMovieFileURL = movieURL
@@ -1077,8 +1130,20 @@ class CameraManager: NSObject, ObservableObject {
             frameRateSelectionReason = L10n.string("debug.frameRate.applyFailed", preferredFrameRate, applyFailures.joined(separator: "; "))
         }
 
+        configureNativePhotoOutputsForActiveFormats()
         updateFrameRateDebugInfo()
         refreshRearFocalCapability()
+    }
+
+    private func configureNativePhotoOutputsForActiveFormats() {
+        if let output = frontCamera.photoOutput, let device = frontCamera.device {
+            configurePhotoOutput(output)
+            configurePhotoOutputDimensions(output, for: device)
+        }
+        if let output = backCamera.photoOutput, let device = backCamera.device {
+            configurePhotoOutput(output)
+            configurePhotoOutputDimensions(output, for: device)
+        }
     }
 
     private func resolveFrameRateSelection(
@@ -1146,13 +1211,17 @@ class CameraManager: NSObject, ObservableObject {
         let width = Int(max(dimensions.width, dimensions.height))
         let height = Int(min(dimensions.width, dimensions.height))
         let pixels = width * height
+        let aspectRatio = Double(width) / Double(height)
+        let isFourByThree = abs(aspectRatio - 4.0 / 3.0) < 0.02
+        let isSixteenByNine = abs(aspectRatio - 16.0 / 9.0) < 0.02
 
-        if width == 1280 && height == 720 {
-            return pixels
+        if isFourByThree {
+            let targetPixels = 1920 * 1440
+            let lowResolutionPenalty = pixels < 1280 * 960 ? 20_000_000 : 0
+            return lowResolutionPenalty + abs(pixels - targetPixels)
         }
 
-        let isSixteenByNine = abs(Double(width) / Double(height) - 16.0 / 9.0) < 0.02
-        return (isSixteenByNine ? 10_000_000 : 20_000_000) + pixels
+        return (isSixteenByNine ? 30_000_000 : 40_000_000) + pixels
     }
 
     private func formatDimensions(_ format: AVCaptureDevice.Format) -> CMVideoDimensions {
@@ -1537,14 +1606,14 @@ class CameraManager: NSObject, ObservableObject {
             let frontPhotoOutput = AVCapturePhotoOutput()
             if multiCamSession.canAddOutput(frontPhotoOutput) {
                 multiCamSession.addOutputWithNoConnections(frontPhotoOutput)
-                frontPhotoOutput.maxPhotoQualityPrioritization = .quality
+                configurePhotoOutput(frontPhotoOutput)
                 frontCamera.photoOutput = frontPhotoOutput
             }
 
             let backPhotoOutput = AVCapturePhotoOutput()
             if multiCamSession.canAddOutput(backPhotoOutput) {
                 multiCamSession.addOutputWithNoConnections(backPhotoOutput)
-                backPhotoOutput.maxPhotoQualityPrioritization = .quality
+                configurePhotoOutput(backPhotoOutput)
                 backCamera.photoOutput = backPhotoOutput
             }
 
@@ -1585,6 +1654,7 @@ class CameraManager: NSObject, ObservableObject {
                 if multiCamSession.canAddConnection(connection) {
                     multiCamSession.addConnection(connection)
                     configureVideoConnection(connection, cameraType: .front)
+                    configurePhotoOutputDimensions(frontPhotoOutput, for: frontDevice)
                 }
             }
 
@@ -1616,6 +1686,7 @@ class CameraManager: NSObject, ObservableObject {
                 if multiCamSession.canAddConnection(connection) {
                     multiCamSession.addConnection(connection)
                     configureVideoConnection(connection, cameraType: .back)
+                    configurePhotoOutputDimensions(backPhotoOutput, for: backDevice)
                 }
             }
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-22 - Rear camera native FOV and photo quality
+
+### Changed
+
+- Changed rear camera capture format selection to prefer 4:3 formats so rear photos align more closely with the iPhone native Camera field of view.
+- Changed rear-camera compositing to preserve the full rear frame while keeping the front overlay fill behavior.
+- Requested the highest supported 4:3 photo dimensions from `AVCapturePhotoOutput` after video connections are established.
+- Composited native photo captures at the rear photo's source pixel size and increased JPEG export quality.
+
+### Verified
+
+- Real-device validation confirmed rear-camera framing is now close to the native iPhone Camera view.
+- Simulator validation was intentionally skipped because this change depends on physical camera hardware.
+
 ## 2026-06-20 - Works video detail cover preview
 
 ### Fixed
