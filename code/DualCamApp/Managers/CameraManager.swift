@@ -444,6 +444,7 @@ class CameraManager: NSObject, ObservableObject {
     private var isAudioConfigured = false
     private var isMultiCamConfigured = false
     private var startupTimeoutTask: Task<Void, Never>?
+    private var micPollingTask: Task<Void, Never>?
     private var hasAttemptedRuntimeErrorRecovery = false
     private var frameRateSelectionReason = L10n.string("debug.camera.waiting")
     private var measuredFrontFrameRate: Double?
@@ -621,6 +622,7 @@ class CameraManager: NSObject, ObservableObject {
             sessionInterruptionHandler?()
             sessionInterruptionReason = "error.camera.interrupted.inCall"
             isSessionInterrupted = true
+            startMicPollingForRecovery()
             return
         }
 
@@ -633,6 +635,7 @@ class CameraManager: NSObject, ObservableObject {
                 sessionInterruptionHandler?()
                 sessionInterruptionReason = "error.camera.interrupted.inCall"
                 isSessionInterrupted = true
+                startMicPollingForRecovery()
                 return
             }
 
@@ -669,6 +672,7 @@ class CameraManager: NSObject, ObservableObject {
             sessionInterruptionHandler?()
             sessionInterruptionReason = "error.camera.interrupted.inCall"
             isSessionInterrupted = true
+            startMicPollingForRecovery()
             return
         }
 
@@ -699,6 +703,7 @@ class CameraManager: NSObject, ObservableObject {
             sessionInterruptionHandler?()
             sessionInterruptionReason = "error.camera.interrupted.inCall"
             isSessionInterrupted = true
+            startMicPollingForRecovery()
             return
         }
 
@@ -824,6 +829,7 @@ class CameraManager: NSObject, ObservableObject {
         iPadRearStartupRequested = false
         removeSessionObservers()
         cancelStartupTimeout()
+        stopMicPolling()
         resetFirstFrameReadiness()
         let frontSession = frontSession
         let backSession = backSession
@@ -850,6 +856,7 @@ class CameraManager: NSObject, ObservableObject {
         isSessionInterrupted = false
         sessionInterruptionReason = nil
         hasAttemptedRuntimeErrorRecovery = false
+        stopMicPolling()
         stopCapture()
         try? await Task.sleep(nanoseconds: 300_000_000)
         await startCapture()
@@ -890,6 +897,27 @@ class CameraManager: NSObject, ObservableObject {
     private func cancelStartupTimeout() {
         startupTimeoutTask?.cancel()
         startupTimeoutTask = nil
+    }
+
+    private func startMicPollingForRecovery() {
+        stopMicPolling()
+        micPollingTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                guard let self, !Task.isCancelled else { break }
+                guard self.isSessionInterrupted else { break }
+                if !AVAudioSession.sharedInstance().isOtherAudioPlaying {
+                    self.stopMicPolling()
+                    await self.restartSession()
+                    break
+                }
+            }
+        }
+    }
+
+    private func stopMicPolling() {
+        micPollingTask?.cancel()
+        micPollingTask = nil
     }
 
     @objc private func handleSessionWasInterrupted(_ notification: Notification) {
