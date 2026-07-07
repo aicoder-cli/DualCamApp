@@ -71,6 +71,7 @@ class VideoRecorder: ObservableObject {
 
     var outputPhotoSize: CGSize { photoSize }
     var outputVideoSize: CGSize { videoSize }
+    var recordingUnavailableHandler: (() -> Void)?
 
     func applyOutputSpec(_ spec: MediaOutputSpec) {
         guard recordingState == .idle else { return }
@@ -187,12 +188,14 @@ class VideoRecorder: ObservableObject {
 
         guard startTime != nil else {
             errorMessage = L10n.string("error.album.noRecordedVideo")
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
 
         guard assetWriter?.status == .writing else {
             errorMessage = L10n.string("error.video.writeFailed", assetWriter?.error?.localizedDescription ?? L10n.string("error.recorder.invalidState"))
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
@@ -200,6 +203,7 @@ class VideoRecorder: ObservableObject {
         markInputsAsFinished()
 
         guard await finishWriting() else {
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
@@ -290,12 +294,14 @@ class VideoRecorder: ObservableObject {
 
         guard startTime != nil else {
             errorMessage = L10n.string("error.album.noRecordedVideo")
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
 
         guard assetWriter?.status == .writing else {
             errorMessage = L10n.string("error.video.writeFailed", assetWriter?.error?.localizedDescription ?? L10n.string("error.recorder.invalidState"))
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
@@ -303,6 +309,7 @@ class VideoRecorder: ObservableObject {
         markInputsAsFinished()
 
         guard await finishWriting() else {
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
@@ -450,6 +457,12 @@ class VideoRecorder: ObservableObject {
         if let audioInput, assetWriter.inputs.contains(where: { $0 === audioInput }) {
             audioInput.markAsFinished()
         }
+    }
+
+    private func removeCurrentOutputFileIfPresent() {
+        guard let outputURL else { return }
+        try? FileManager.default.removeItem(at: outputURL)
+        self.outputURL = nil
     }
 
     /// 完成写入
@@ -2087,7 +2100,14 @@ class VideoRecorder: ObservableObject {
 
     private func reportWriterFailure(context: String) {
         Task { @MainActor [weak self] in
-            self?.errorMessage = context
+            guard let self else { return }
+            if self.recordingDuration == 0 {
+                self.recordingUnavailableHandler?()
+                self.removeCurrentOutputFileIfPresent()
+                self.resetRecordingState()
+            } else {
+                self.errorMessage = context
+            }
         }
     }
 
@@ -2105,7 +2125,13 @@ class VideoRecorder: ObservableObject {
             self.recordedDurationString = String(format: "%02d:%02d", minutes, seconds)
         }
     }
-    
+
+    func stopRecordingForInterruption() {
+        Task { @MainActor [weak self] in
+            await self?.stopRecording(saveToSystemPhotos: false)
+        }
+    }
+
     @MainActor
     private func resetRecordingState() {
         recordingState = .idle
