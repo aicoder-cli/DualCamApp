@@ -617,10 +617,24 @@ class CameraManager: NSObject, ObservableObject {
         guard await requestPermissions() else { return }
         guard await requestMicrophonePermission() else { return }
 
+        if AVAudioSession.sharedInstance().isOtherAudioPlaying {
+            sessionInterruptionHandler?()
+            sessionInterruptionReason = "error.camera.interrupted.inCall"
+            isSessionInterrupted = true
+            return
+        }
+
         addSessionObservers()
 
         if hasMultiCameraSupport {
             await setupMultiCamSession()
+
+            if !isAudioConfigured, AVAudioSession.sharedInstance().isOtherAudioPlaying {
+                sessionInterruptionHandler?()
+                sessionInterruptionReason = "error.camera.interrupted.inCall"
+                isSessionInterrupted = true
+                return
+            }
 
             if isMultiCamConfigured && frontCameraReady && backCameraReady {
                 let multiCamSession = multiCamSession
@@ -651,6 +665,13 @@ class CameraManager: NSObject, ObservableObject {
         await setupBackCamera()
         await setupAudio()
 
+        if !isAudioConfigured, AVAudioSession.sharedInstance().isOtherAudioPlaying {
+            sessionInterruptionHandler?()
+            sessionInterruptionReason = "error.camera.interrupted.inCall"
+            isSessionInterrupted = true
+            return
+        }
+
         let frontSession = frontSession
         let backSession = backSession
         await withCheckedContinuation { continuation in
@@ -673,6 +694,14 @@ class CameraManager: NSObject, ObservableObject {
     private func startIPadFrontFirstCapture() async {
         await setupFrontCamera()
         await setupAudio(on: frontSession)
+
+        if !isAudioConfigured, AVAudioSession.sharedInstance().isOtherAudioPlaying {
+            sessionInterruptionHandler?()
+            sessionInterruptionReason = "error.camera.interrupted.inCall"
+            isSessionInterrupted = true
+            return
+        }
+
         resetIPadDelayedRearStartupState()
 
         let frontSession = frontSession
