@@ -231,7 +231,10 @@ struct ContentView: View {
                     .zIndex(2)
                 }
 
-                if hasStartupFailure {
+                if cameraManager.isSessionInterrupted {
+                    CameraInterruptedOverlay(reasonKey: cameraManager.sessionInterruptionReason)
+                        .transition(.opacity)
+                } else if hasStartupFailure {
                     CameraFailureOverlay(
                         message: cameraManager.errorMessage!,
                         onRetry: {
@@ -239,9 +242,6 @@ struct ContentView: View {
                         }
                     )
                     .transition(.opacity)
-                } else if cameraManager.isSessionInterrupted {
-                    CameraInterruptedOverlay(reasonKey: cameraManager.sessionInterruptionReason)
-                        .transition(.opacity)
                 } else if let error = cameraManager.errorMessage ?? videoRecorder.errorMessage {
                     ErrorBanner(message: error) {
                         withAnimation { cameraManager.errorMessage = nil; videoRecorder.errorMessage = nil }
@@ -665,6 +665,7 @@ struct ContentView: View {
             Task<Void, Never> {
                 await cameraManager.setPreferredFrameRate(Int32(frameRate))
                 guard videoRecorder.recordingState == .idle else { return }
+                guard await cameraManager.prepareForRecording() else { return }
                 let snapshot = updateRecordingLayoutSnapshot()
                 if (try? cameraManager.startNativeMovieRecording()) != nil {
                     if videoRecorder.startNativeMovieRecordingSession(frameRate: cameraManager.effectiveFrameRate, initialLayoutSnapshot: snapshot) {
@@ -772,6 +773,10 @@ struct ContentView: View {
             videoRecorder.processAudioSampleBuffer(sampleBuffer)
         }
 
+        videoRecorder.recordingUnavailableHandler = { [cameraManager] in
+            cameraManager.markRecordingUnavailableDueToCall()
+        }
+
         cameraManager.sessionInterruptionHandler = { [videoRecorder] in
             videoRecorder.stopRecordingForInterruption()
         }
@@ -864,6 +869,7 @@ struct ContentView: View {
 
     private func clearRecordingHandlers() {
         videoRecorder.workCompletedHandler = nil
+        videoRecorder.recordingUnavailableHandler = nil
         cameraManager.frontVideoFrameHandler = nil
         cameraManager.backVideoFrameHandler = nil
         cameraManager.audioSampleBufferHandler = nil

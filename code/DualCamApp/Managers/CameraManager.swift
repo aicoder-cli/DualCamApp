@@ -444,7 +444,7 @@ class CameraManager: NSObject, ObservableObject {
     private var isAudioConfigured = false
     private var isMultiCamConfigured = false
     private var startupTimeoutTask: Task<Void, Never>?
-    private var micPollingTask: Task<Void, Never>?
+    private var callRecoveryTask: Task<Void, Never>?
     private var hasAttemptedRuntimeErrorRecovery = false
     private var frameRateSelectionReason = L10n.string("debug.camera.waiting")
     private var measuredFrontFrameRate: Double?
@@ -582,7 +582,7 @@ class CameraManager: NSObject, ObservableObject {
     /// 请求麦克风权限
     func requestMicrophonePermission() async -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
-        
+
         switch status {
         case .authorized:
             return true
@@ -604,7 +604,38 @@ class CameraManager: NSObject, ObservableObject {
             return false
         }
     }
-    
+
+    private func configureAudioSessionPolicy() {
+        frontSession.automaticallyConfiguresApplicationAudioSession = false
+        backSession.automaticallyConfiguresApplicationAudioSession = false
+        multiCamSession.automaticallyConfiguresApplicationAudioSession = false
+
+        try? AVAudioSession.sharedInstance().setCategory(
+            .playAndRecord,
+            mode: .videoRecording,
+            options: [.mixWithOthers, .defaultToSpeaker, .allowBluetooth]
+        )
+    }
+
+    func prepareForRecording() async -> Bool {
+        if sessionInterruptionReason == "error.camera.interrupted.inCall" {
+            stopCallRecoveryPolling()
+            isSessionInterrupted = false
+            sessionInterruptionReason = nil
+            await restartSession()
+        }
+
+        guard canUseAudioInput() else {
+            markRecordingUnavailableDueToCall()
+            return false
+        }
+        return true
+    }
+
+    func markRecordingUnavailableDueToCall() {
+        markCaptureUnavailableDueToCall()
+    }
+
     /// 启动摄像头会话
     func startCapture() async {
         didFinishStartupAttempt = false
@@ -618,26 +649,12 @@ class CameraManager: NSObject, ObservableObject {
         guard await requestPermissions() else { return }
         guard await requestMicrophonePermission() else { return }
 
-        if AVAudioSession.sharedInstance().isOtherAudioPlaying {
-            sessionInterruptionHandler?()
-            sessionInterruptionReason = "error.camera.interrupted.inCall"
-            isSessionInterrupted = true
-            startMicPollingForRecovery()
-            return
-        }
-
+        configureAudioSessionPolicy()
         addSessionObservers()
 
         if hasMultiCameraSupport {
             await setupMultiCamSession()
-
-            if !isAudioConfigured, AVAudioSession.sharedInstance().isOtherAudioPlaying {
-                sessionInterruptionHandler?()
-                sessionInterruptionReason = "error.camera.interrupted.inCall"
-                isSessionInterrupted = true
-                startMicPollingForRecovery()
-                return
-            }
+            if isSessionInterrupted { return }
 
             if isMultiCamConfigured && frontCameraReady && backCameraReady {
                 let multiCamSession = multiCamSession
@@ -667,14 +684,7 @@ class CameraManager: NSObject, ObservableObject {
         await setupFrontCamera()
         await setupBackCamera()
         await setupAudio()
-
-        if !isAudioConfigured, AVAudioSession.sharedInstance().isOtherAudioPlaying {
-            sessionInterruptionHandler?()
-            sessionInterruptionReason = "error.camera.interrupted.inCall"
-            isSessionInterrupted = true
-            startMicPollingForRecovery()
-            return
-        }
+        if isSessionInterrupted { return }
 
         let frontSession = frontSession
         let backSession = backSession
@@ -698,14 +708,7 @@ class CameraManager: NSObject, ObservableObject {
     private func startIPadFrontFirstCapture() async {
         await setupFrontCamera()
         await setupAudio(on: frontSession)
-
-        if !isAudioConfigured, AVAudioSession.sharedInstance().isOtherAudioPlaying {
-            sessionInterruptionHandler?()
-            sessionInterruptionReason = "error.camera.interrupted.inCall"
-            isSessionInterrupted = true
-            startMicPollingForRecovery()
-            return
-        }
+        if isSessionInterrupted { return }
 
         resetIPadDelayedRearStartupState()
 
@@ -742,10 +745,13 @@ class CameraManager: NSObject, ObservableObject {
         if isFront {
             guard !hasDeliveredFrontVideoFrame else { return }
             hasDeliveredFrontVideoFrame = true
-            cancelStartupTimeout()
         } else {
             guard !hasDeliveredBackVideoFrame else { return }
             hasDeliveredBackVideoFrame = true
+        }
+
+        if hasDeliveredRequiredVideoFrames {
+            cancelStartupTimeout()
         }
     }
 
@@ -829,7 +835,7 @@ class CameraManager: NSObject, ObservableObject {
         iPadRearStartupRequested = false
         removeSessionObservers()
         cancelStartupTimeout()
-        stopMicPolling()
+        stopCallRecoveryPolling()
         resetFirstFrameReadiness()
         let frontSession = frontSession
         let backSession = backSession
@@ -856,7 +862,7 @@ class CameraManager: NSObject, ObservableObject {
         isSessionInterrupted = false
         sessionInterruptionReason = nil
         hasAttemptedRuntimeErrorRecovery = false
-        stopMicPolling()
+        stopCallRecoveryPolling()
         stopCapture()
         try? await Task.sleep(nanoseconds: 300_000_000)
         await startCapture()
@@ -888,7 +894,12 @@ class CameraManager: NSObject, ObservableObject {
         startupTimeoutTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 8_000_000_000)
             guard let self, !Task.isCancelled else { return }
-            guard !self.hasDeliveredFrontVideoFrame else { return }
+            guard !self.hasDeliveredRequiredVideoFrames else { return }
+            guard !self.isSessionInterrupted else {
+                self.errorMessage = nil
+                self.didFinishStartupAttempt = true
+                return
+            }
             self.errorMessage = L10n.string("error.camera.startupTimeout")
             self.didFinishStartupAttempt = true
         }
@@ -899,25 +910,66 @@ class CameraManager: NSObject, ObservableObject {
         startupTimeoutTask = nil
     }
 
-    private func startMicPollingForRecovery() {
-        stopMicPolling()
-        micPollingTask = Task { @MainActor [weak self] in
+    private func markCaptureUnavailableDueToCall() {
+        cancelStartupTimeout()
+        errorMessage = nil
+        sessionInterruptionReason = "error.camera.interrupted.inCall"
+        isSessionInterrupted = true
+        didFinishStartupAttempt = true
+        startCallRecoveryPolling()
+    }
+
+    private func startCallRecoveryPolling() {
+        guard callRecoveryTask == nil else { return }
+        callRecoveryTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 guard let self, !Task.isCancelled else { break }
-                guard self.isSessionInterrupted else { break }
-                if !AVAudioSession.sharedInstance().isOtherAudioPlaying {
-                    self.stopMicPolling()
-                    await self.restartSession()
+                guard self.isSessionInterrupted,
+                      self.sessionInterruptionReason == "error.camera.interrupted.inCall" else { break }
+                if !AVAudioSession.sharedInstance().isOtherAudioPlaying,
+                   self.canUseAudioInput() {
+                    self.stopCallRecoveryPolling()
+                    self.isSessionInterrupted = false
+                    self.sessionInterruptionReason = nil
+                    if !self.isSessionRunning {
+                        await self.restartSession()
+                    }
                     break
                 }
             }
         }
     }
 
-    private func stopMicPolling() {
-        micPollingTask?.cancel()
-        micPollingTask = nil
+    private func stopCallRecoveryPolling() {
+        callRecoveryTask?.cancel()
+        callRecoveryTask = nil
+    }
+
+    private func canUseAudioInput() -> Bool {
+        configureAudioSessionPolicy()
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setActive(true)
+            return audioSession.isInputAvailable
+        } catch {
+            return false
+        }
+    }
+
+    private func markCaptureInterrupted(reasonKey: String) {
+        cancelStartupTimeout()
+        errorMessage = nil
+        sessionInterruptionReason = reasonKey
+        isSessionInterrupted = true
+        didFinishStartupAttempt = true
+    }
+
+    private func isCaptureDeviceUnavailableError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == AVFoundationErrorDomain else { return false }
+        let code = AVError.Code(rawValue: nsError.code)
+        return code == .deviceAlreadyUsedByAnotherSession || code == .deviceInUseByAnotherApplication
     }
 
     @objc private func handleSessionWasInterrupted(_ notification: Notification) {
@@ -934,12 +986,7 @@ class CameraManager: NSObject, ObservableObject {
             // Usually a phone call — both camera and mic are taken by the system
             reasonKey = "error.camera.interrupted.inCall"
         case .videoDeviceInUseByAnotherClient:
-            // Another app is using the camera; check if mic is also occupied
-            if AVAudioSession.sharedInstance().isOtherAudioPlaying {
-                reasonKey = "error.camera.interrupted.inCall"
-            } else {
-                reasonKey = "error.camera.interrupted.cameraInUse"
-            }
+            reasonKey = "error.camera.interrupted.cameraInUse"
         case .videoDeviceNotAvailableInBackground:
             reasonKey = "error.camera.interrupted.inCall"
         default:
@@ -947,10 +994,14 @@ class CameraManager: NSObject, ObservableObject {
         }
 
         let handler = sessionInterruptionHandler
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             handler?()
-            sessionInterruptionReason = reasonKey
-            isSessionInterrupted = true
+            if reasonKey == "error.camera.interrupted.inCall" {
+                self.markCaptureUnavailableDueToCall()
+            } else {
+                self.markCaptureInterrupted(reasonKey: reasonKey)
+            }
         }
     }
 
@@ -1017,17 +1068,21 @@ class CameraManager: NSObject, ObservableObject {
               let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
 
         if type == .began {
-            // Mic was taken by another app (e.g., phone call)
-            let reasonKey = "error.camera.interrupted.inCall"
             let handler = sessionInterruptionHandler
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 handler?()
-                sessionInterruptionReason = reasonKey
-                isSessionInterrupted = true
+                self?.markCaptureUnavailableDueToCall()
             }
         } else if type == .ended {
-            // Audio interruption ended — the video session interruptionEnded
-            // handler will take care of restarting the camera session
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.stopCallRecoveryPolling()
+                self.isSessionInterrupted = false
+                self.sessionInterruptionReason = nil
+                if !self.isSessionRunning {
+                    await self.restartSession()
+                }
+            }
         }
     }
 
@@ -1952,25 +2007,34 @@ class CameraManager: NSObject, ObservableObject {
             }
 
             if let audioDevice = AVCaptureDevice.default(for: .audio) {
-                let input = try AVCaptureDeviceInput(device: audioDevice)
-                if multiCamSession.canAddInput(input) {
-                    multiCamSession.addInputWithNoConnections(input)
-                    audioInput = input
+                do {
+                    let input = try AVCaptureDeviceInput(device: audioDevice)
+                    if multiCamSession.canAddInput(input) {
+                        multiCamSession.addInputWithNoConnections(input)
+                        audioInput = input
 
-                    let output = AVCaptureAudioDataOutput()
-                    output.setSampleBufferDelegate(self, queue: audioDataOutputQueue)
-                    if multiCamSession.canAddOutput(output) {
-                        multiCamSession.addOutputWithNoConnections(output)
-                        audioOutput = output
-                        _audioOutput = output
+                        let output = AVCaptureAudioDataOutput()
+                        output.setSampleBufferDelegate(self, queue: audioDataOutputQueue)
+                        if multiCamSession.canAddOutput(output) {
+                            multiCamSession.addOutputWithNoConnections(output)
+                            audioOutput = output
+                            _audioOutput = output
 
-                        if let audioPort = input.ports.first {
-                            let audioConnection = AVCaptureConnection(inputPorts: [audioPort], output: output)
-                            if multiCamSession.canAddConnection(audioConnection) {
-                                multiCamSession.addConnection(audioConnection)
+                            if let audioPort = input.ports.first {
+                                let audioConnection = AVCaptureConnection(inputPorts: [audioPort], output: output)
+                                if multiCamSession.canAddConnection(audioConnection) {
+                                    multiCamSession.addConnection(audioConnection)
+                                }
                             }
                         }
                     }
+                } catch {
+                    multiCamSession.commitConfiguration()
+                    if isCaptureDeviceUnavailableError(error) {
+                        markCaptureUnavailableDueToCall()
+                        return
+                    }
+                    throw error
                 }
             }
 
@@ -2169,7 +2233,11 @@ class CameraManager: NSObject, ObservableObject {
 
         } catch {
             session.commitConfiguration()
-            errorMessage = L10n.string("error.microphone.setupFailed", error.localizedDescription)
+            if isCaptureDeviceUnavailableError(error) {
+                markCaptureUnavailableDueToCall()
+            } else {
+                errorMessage = L10n.string("error.microphone.setupFailed", error.localizedDescription)
+            }
         }
     }
     

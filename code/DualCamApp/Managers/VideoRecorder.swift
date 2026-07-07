@@ -71,6 +71,7 @@ class VideoRecorder: ObservableObject {
 
     var outputPhotoSize: CGSize { photoSize }
     var outputVideoSize: CGSize { videoSize }
+    var recordingUnavailableHandler: (() -> Void)?
 
     func applyOutputSpec(_ spec: MediaOutputSpec) {
         guard recordingState == .idle else { return }
@@ -187,12 +188,14 @@ class VideoRecorder: ObservableObject {
 
         guard startTime != nil else {
             errorMessage = L10n.string("error.album.noRecordedVideo")
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
 
         guard assetWriter?.status == .writing else {
             errorMessage = L10n.string("error.video.writeFailed", assetWriter?.error?.localizedDescription ?? L10n.string("error.recorder.invalidState"))
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
@@ -200,6 +203,7 @@ class VideoRecorder: ObservableObject {
         markInputsAsFinished()
 
         guard await finishWriting() else {
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
@@ -290,12 +294,14 @@ class VideoRecorder: ObservableObject {
 
         guard startTime != nil else {
             errorMessage = L10n.string("error.album.noRecordedVideo")
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
 
         guard assetWriter?.status == .writing else {
             errorMessage = L10n.string("error.video.writeFailed", assetWriter?.error?.localizedDescription ?? L10n.string("error.recorder.invalidState"))
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
@@ -303,6 +309,7 @@ class VideoRecorder: ObservableObject {
         markInputsAsFinished()
 
         guard await finishWriting() else {
+            removeCurrentOutputFileIfPresent()
             resetRecordingState()
             return
         }
@@ -450,6 +457,12 @@ class VideoRecorder: ObservableObject {
         if let audioInput, assetWriter.inputs.contains(where: { $0 === audioInput }) {
             audioInput.markAsFinished()
         }
+    }
+
+    private func removeCurrentOutputFileIfPresent() {
+        guard let outputURL else { return }
+        try? FileManager.default.removeItem(at: outputURL)
+        self.outputURL = nil
     }
 
     /// 完成写入
@@ -2087,7 +2100,14 @@ class VideoRecorder: ObservableObject {
 
     private func reportWriterFailure(context: String) {
         Task { @MainActor [weak self] in
-            self?.errorMessage = context
+            guard let self else { return }
+            if self.recordingDuration == 0 {
+                self.recordingUnavailableHandler?()
+                self.removeCurrentOutputFileIfPresent()
+                self.resetRecordingState()
+            } else {
+                self.errorMessage = context
+            }
         }
     }
 
@@ -2106,33 +2126,10 @@ class VideoRecorder: ObservableObject {
         }
     }
 
-    /// Session 中断时安全停止录制，不等待 finishWriting 完成
     func stopRecordingForInterruption() {
-        guard recordingState == .recording else { return }
-        recordingState = .stopping
-        isRecording = false
-        isNativeMovieRecordingActive = false
-
-        processingQueue.sync {}
-        mediaWritingQueue.sync {}
-
-        guard let assetWriter, startTime != nil else {
-            resetRecordingState()
-            return
+        Task { @MainActor [weak self] in
+            await self?.stopRecording(saveToSystemPhotos: false)
         }
-
-        if let videoInput, assetWriter.inputs.contains(where: { $0 === videoInput }) {
-            videoInput.markAsFinished()
-        }
-        if let audioInput, assetWriter.inputs.contains(where: { $0 === audioInput }) {
-            audioInput.markAsFinished()
-        }
-
-        if assetWriter.status == .writing {
-            assetWriter.finishWriting {}
-        }
-
-        resetRecordingState()
     }
 
     @MainActor

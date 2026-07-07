@@ -643,7 +643,14 @@ final class WorksManager: ObservableObject {
         let name = url.lastPathComponent
         let ext = url.pathExtension.lowercased()
         guard name.hasPrefix("dual_camera_") else { return false }
-        return ext == "mp4" || ext == "jpg" || ext == "jpeg"
+
+        if ext == "mp4" {
+            let values = try? url.resourceValues(forKeys: [.fileSizeKey])
+            guard (values?.fileSize ?? 0) > 0 else { return false }
+            return (videoDuration(for: url) ?? 0) > 0.1
+        }
+
+        return ext == "jpg" || ext == "jpeg"
     }
 
     private func makeWorkItem(from draft: RecordedWorkDraft) throws -> WorkItem {
