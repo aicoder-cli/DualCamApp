@@ -408,6 +408,7 @@ class CameraManager: NSObject, ObservableObject {
     @Published var nativeOutputStatus: NativeOutputStatus = .pending
     @Published var rearFocalCapability = RearFocalCapability.fallback
     @Published var rearZoomFactor: CGFloat = 1
+    @Published var isSessionInterrupted = false
 
     var rearLensStatus: RearLensStatus {
         rearFocalCapability.lensStatus(for: rearZoomFactor)
@@ -441,6 +442,8 @@ class CameraManager: NSObject, ObservableObject {
     private var isBackCameraConfigured = false
     private var isAudioConfigured = false
     private var isMultiCamConfigured = false
+    private var startupTimeoutTask: Task<Void, Never>?
+    private var hasAttemptedRuntimeErrorRecovery = false
     private var frameRateSelectionReason = L10n.string("debug.camera.waiting")
     private var measuredFrontFrameRate: Double?
     private var measuredBackFrameRate: Double?
@@ -484,6 +487,7 @@ class CameraManager: NSObject, ObservableObject {
     nonisolated(unsafe) var frontVideoFrameHandler: ((CMSampleBuffer) -> Void)?
     nonisolated(unsafe) var backVideoFrameHandler: ((CMSampleBuffer) -> Void)?
     nonisolated(unsafe) var audioSampleBufferHandler: ((CMSampleBuffer) -> Void)?
+    var sessionInterruptionHandler: (() -> Void)?
     
     // MARK: - Initialization
     override init() {
@@ -603,11 +607,15 @@ class CameraManager: NSObject, ObservableObject {
     func startCapture() async {
         didFinishStartupAttempt = false
         errorMessage = nil
+        isSessionInterrupted = false
+        hasAttemptedRuntimeErrorRecovery = false
         resetFirstFrameReadiness()
         defer { didFinishStartupAttempt = true }
 
         guard await requestPermissions() else { return }
         guard await requestMicrophonePermission() else { return }
+
+        addSessionObservers()
 
         if hasMultiCameraSupport {
             await setupMultiCamSession()
@@ -624,6 +632,7 @@ class CameraManager: NSObject, ObservableObject {
                 }
                 refreshVideoOrientations()
                 isSessionRunning = multiCamSession.isRunning
+                startStartupTimeout()
                 return
             }
 
@@ -656,6 +665,7 @@ class CameraManager: NSObject, ObservableObject {
 
         refreshVideoOrientations()
         isSessionRunning = (frontCameraReady && frontSession.isRunning) || (backCameraReady && backSession.isRunning)
+        startStartupTimeout()
     }
 
     private func startIPadFrontFirstCapture() async {
@@ -676,6 +686,7 @@ class CameraManager: NSObject, ObservableObject {
         backCameraReady = false
         refreshVideoOrientations()
         isSessionRunning = frontCameraReady && frontSession.isRunning
+        startStartupTimeout()
     }
 
     private func resetIPadDelayedRearStartupState() {
@@ -695,6 +706,7 @@ class CameraManager: NSObject, ObservableObject {
         if isFront {
             guard !hasDeliveredFrontVideoFrame else { return }
             hasDeliveredFrontVideoFrame = true
+            cancelStartupTimeout()
         } else {
             guard !hasDeliveredBackVideoFrame else { return }
             hasDeliveredBackVideoFrame = true
@@ -779,6 +791,8 @@ class CameraManager: NSObject, ObservableObject {
     func stopCapture() {
         isIPadDelayedRearStartupActive = false
         iPadRearStartupRequested = false
+        removeSessionObservers()
+        cancelStartupTimeout()
         resetFirstFrameReadiness()
         let frontSession = frontSession
         let backSession = backSession
@@ -798,7 +812,121 @@ class CameraManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
+    /// 重启摄像头会话（供重试按钮调用）
+    func restartSession() async {
+        errorMessage = nil
+        isSessionInterrupted = false
+        hasAttemptedRuntimeErrorRecovery = false
+        stopCapture()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        await startCapture()
+    }
+
+    // MARK: - Session Interruption & Recovery
+
+    private func addSessionObservers() {
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(handleSessionWasInterrupted(_:)),
+                       name: .AVCaptureSessionWasInterrupted, object: nil)
+        nc.addObserver(self, selector: #selector(handleSessionInterruptionEnded(_:)),
+                       name: .AVCaptureSessionInterruptionEnded, object: nil)
+        nc.addObserver(self, selector: #selector(handleSessionRuntimeError(_:)),
+                       name: .AVCaptureSessionRuntimeError, object: nil)
+    }
+
+    private func removeSessionObservers() {
+        NotificationCenter.default.removeObserver(self, name: .AVCaptureSessionWasInterrupted, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVCaptureSessionInterruptionEnded, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVCaptureSessionRuntimeError, object: nil)
+    }
+
+    private func startStartupTimeout() {
+        cancelStartupTimeout()
+        startupTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            guard !self.hasDeliveredFrontVideoFrame else { return }
+            self.errorMessage = L10n.string("error.camera.startupTimeout")
+            self.didFinishStartupAttempt = true
+        }
+    }
+
+    private func cancelStartupTimeout() {
+        startupTimeoutTask?.cancel()
+        startupTimeoutTask = nil
+    }
+
+    @objc private func handleSessionWasInterrupted(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVCaptureSessionInterruptionReasonKey] as? Int,
+              let reason = AVCaptureSession.InterruptionReason(rawValue: reasonValue),
+              reason == .videoDeviceNotAvailableInBackground || reason == .videoDeviceNotAvailableDueToSystemPressure || reason == .videoDeviceInUseByAnotherClient else {
+            return
+        }
+        let handler = sessionInterruptionHandler
+        Task { @MainActor in
+            handler?()
+            isSessionInterrupted = true
+        }
+    }
+
+    @objc private func handleSessionInterruptionEnded(_ notification: Notification) {
+        isSessionInterrupted = false
+        Task<Void, Never> { @MainActor [weak self] in
+            guard let self else { return }
+            self.resetFirstFrameReadiness()
+            let frontSession = self.frontSession
+            let backSession = self.backSession
+            let multiCamSession = self.multiCamSession
+            await withCheckedContinuation { continuation in
+                self.sessionQueue.async {
+                    if !frontSession.isRunning, self.isFrontCameraConfigured {
+                        frontSession.startRunning()
+                    }
+                    if !backSession.isRunning, self.isBackCameraConfigured {
+                        backSession.startRunning()
+                    }
+                    if !multiCamSession.isRunning, self.isMultiCamConfigured {
+                        multiCamSession.startRunning()
+                    }
+                    continuation.resume()
+                }
+            }
+            self.isSessionRunning = self.multiCamSession.isRunning || self.frontSession.isRunning || self.backSession.isRunning
+        }
+    }
+
+    @objc private func handleSessionRuntimeError(_ notification: Notification) {
+        guard notification.userInfo?[AVCaptureSessionErrorKey] as? AVError != nil else { return }
+        if !hasAttemptedRuntimeErrorRecovery {
+            hasAttemptedRuntimeErrorRecovery = true
+            Task<Void, Never> { @MainActor [weak self] in
+                guard let self else { return }
+                self.resetFirstFrameReadiness()
+                let frontSession = self.frontSession
+                let backSession = self.backSession
+                let multiCamSession = self.multiCamSession
+                await withCheckedContinuation { continuation in
+                    self.sessionQueue.async {
+                        if multiCamSession.isRunning { multiCamSession.stopRunning() }
+                        if frontSession.isRunning { frontSession.stopRunning() }
+                        if backSession.isRunning { backSession.stopRunning() }
+                        Thread.sleep(forTimeInterval: 0.3)
+                        if self.isMultiCamConfigured { multiCamSession.startRunning() }
+                        if self.isFrontCameraConfigured { frontSession.startRunning() }
+                        if self.isBackCameraConfigured { backSession.startRunning() }
+                        continuation.resume()
+                    }
+                }
+                self.isSessionRunning = self.multiCamSession.isRunning || self.frontSession.isRunning || self.backSession.isRunning
+            }
+        } else {
+            errorMessage = L10n.string("error.camera.runtimeError")
+            didFinishStartupAttempt = true
+        }
+    }
+
     // MARK: - Camera Setup
 
     private func configureVideoConnection(_ connection: AVCaptureConnection?, cameraType: CameraType) {

@@ -134,6 +134,12 @@
 "error.camera.multiSetupFailed" = "双摄像头设置失败：%@";
 "error.camera.frontSetupFailed" = "前置摄像头设置失败：%@";
 "error.camera.backSetupFailed" = "后置摄像头设置失败：%@";
+"error.camera.startupTimeout" = "摄像头启动超时，请点击重试。";
+"error.camera.runtimeError" = "摄像头遇到运行时错误。";
+"error.camera.interrupted" = "摄像头已中断";
+"error.camera.interrupted.subtitle" = "中断结束后摄像头将自动恢复。";
+"camera.unavailable.title" = "摄像头不可用";
+"camera.retry" = "重试";
 "error.microphone.notFound" = "无法找到麦克风。";
 "error.microphone.setupFailed" = "麦克风设置失败：%@";
 

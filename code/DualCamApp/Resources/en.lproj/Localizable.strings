@@ -134,6 +134,12 @@
 "error.camera.multiSetupFailed" = "Dual-camera setup failed: %@";
 "error.camera.frontSetupFailed" = "Front camera setup failed: %@";
 "error.camera.backSetupFailed" = "Back camera setup failed: %@";
+"error.camera.startupTimeout" = "Camera did not start in time. Tap Retry to try again.";
+"error.camera.runtimeError" = "Camera encountered a runtime error.";
+"error.camera.interrupted" = "Camera interrupted";
+"error.camera.interrupted.subtitle" = "The camera will restart automatically when the interruption ends.";
+"camera.unavailable.title" = "Camera Unavailable";
+"camera.retry" = "Retry";
 "error.microphone.notFound" = "Microphone not found.";
 "error.microphone.setupFailed" = "Microphone setup failed: %@";
 

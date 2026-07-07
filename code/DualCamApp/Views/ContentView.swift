@@ -66,6 +66,7 @@ struct ContentView: View {
     @StateObject private var videoRecorder = VideoRecorder()
     @StateObject private var worksManager = WorksManager()
     @StateObject private var captureFeedback = CaptureFeedbackService()
+    @Environment(\.scenePhase) private var scenePhase
 
     // MARK: - State Variables
     @State private var showSettings = false
@@ -124,6 +125,12 @@ struct ContentView: View {
         cameraManager.hasDeliveredRequiredVideoFrames
             && videoRecorder.recordingState == .idle
             && !isCountdownActive
+    }
+
+    private var hasStartupFailure: Bool {
+        cameraManager.errorMessage != nil
+            && !cameraManager.isSessionRunning
+            && cameraManager.didFinishStartupAttempt
     }
 
     private var mediaOutputSpec: MediaOutputSpec {
@@ -224,7 +231,18 @@ struct ContentView: View {
                     .zIndex(2)
                 }
 
-                if let error = cameraManager.errorMessage ?? videoRecorder.errorMessage {
+                if hasStartupFailure {
+                    CameraFailureOverlay(
+                        message: cameraManager.errorMessage!,
+                        onRetry: {
+                            Task<Void, Never> { await cameraManager.restartSession() }
+                        }
+                    )
+                    .transition(.opacity)
+                } else if cameraManager.isSessionInterrupted {
+                    CameraInterruptedOverlay()
+                        .transition(.opacity)
+                } else if let error = cameraManager.errorMessage ?? videoRecorder.errorMessage {
                     ErrorBanner(message: error) {
                         withAnimation { cameraManager.errorMessage = nil; videoRecorder.errorMessage = nil }
                     }
@@ -373,6 +391,22 @@ struct ContentView: View {
         }
         .onChange(of: showCustomizePanel) { isPresented in
             if isPresented { cancelCountdown() }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            switch newPhase {
+            case .active:
+                Task<Void, Never> {
+                    if !cameraManager.isSessionRunning {
+                        await cameraManager.startCapture()
+                    }
+                }
+            case .inactive, .background:
+                if videoRecorder.recordingState == .idle {
+                    cameraManager.stopCapture()
+                }
+            @unknown default:
+                break
+            }
         }
         .onDisappear {
             cancelCountdown()
@@ -737,6 +771,10 @@ struct ContentView: View {
         cameraManager.audioSampleBufferHandler = { sampleBuffer in
             videoRecorder.processAudioSampleBuffer(sampleBuffer)
         }
+
+        cameraManager.sessionInterruptionHandler = { [videoRecorder] in
+            videoRecorder.stopRecordingForInterruption()
+        }
     }
 
     private func applyInitialPreferencesIfNeeded() {
@@ -829,6 +867,7 @@ struct ContentView: View {
         cameraManager.frontVideoFrameHandler = nil
         cameraManager.backVideoFrameHandler = nil
         cameraManager.audioSampleBufferHandler = nil
+        cameraManager.sessionInterruptionHandler = nil
     }
 }
 
@@ -1604,6 +1643,84 @@ extension View {
                 .onChanged { _ in onPress() }
                 .onEnded { _ in onRelease() }
         )
+    }
+}
+
+// MARK: - Camera Overlays
+
+private struct CameraFailureOverlay: View {
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        ZStack {
+            Design.background.ignoresSafeArea()
+
+            RadialGradient(
+                colors: [Color.orange.opacity(0.18), .clear],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 380
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Spacer(minLength: 40)
+
+                VStack(spacing: 16) {
+                    Image(systemName: "camera.fill.badge.exclamationmark")
+                        .font(.system(size: 48))
+                        .foregroundColor(.orange)
+
+                    Text(L10n.string("camera.unavailable.title"))
+                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text(message)
+                        .font(.system(size: 14, weight: .medium))
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(Design.mutedText)
+                        .frame(maxWidth: 280)
+                        .lineSpacing(3)
+                }
+
+                Button(action: onRetry) {
+                    Text(L10n.string("camera.retry"))
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.black)
+                        .frame(maxWidth: 240)
+                        .padding(.vertical, 14)
+                        .background(Capsule().fill(Design.accent))
+                }
+
+                Spacer(minLength: 40)
+            }
+        }
+    }
+}
+
+private struct CameraInterruptedOverlay: View {
+    var body: some View {
+        ZStack {
+            Design.background.opacity(0.88).ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                Image(systemName: "phone.fill.arrow.right")
+                    .font(.system(size: 40))
+                    .foregroundColor(.orange)
+
+                Text(L10n.string("error.camera.interrupted"))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+
+                Text(L10n.string("error.camera.interrupted.subtitle"))
+                    .font(.system(size: 13, weight: .medium))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(Design.mutedText)
+                    .frame(maxWidth: 260)
+                    .lineSpacing(2)
+            }
+        }
     }
 }
 

@@ -134,6 +134,12 @@
 "error.camera.multiSetupFailed" = "雙相機設定失敗：%@";
 "error.camera.frontSetupFailed" = "前置相機設定失敗：%@";
 "error.camera.backSetupFailed" = "後置相機設定失敗：%@";
+"error.camera.startupTimeout" = "鏡頭啟動逾時，請點擊重試。";
+"error.camera.runtimeError" = "鏡頭遇到執行時期錯誤。";
+"error.camera.interrupted" = "鏡頭已中斷";
+"error.camera.interrupted.subtitle" = "中斷結束後鏡頭將自動恢復。";
+"camera.unavailable.title" = "鏡頭不可用";
+"camera.retry" = "重試";
 "error.microphone.notFound" = "找不到麥克風。";
 "error.microphone.setupFailed" = "麥克風設定失敗：%@";
 

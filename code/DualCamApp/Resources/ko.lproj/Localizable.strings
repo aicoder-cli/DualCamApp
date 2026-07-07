@@ -134,6 +134,12 @@
 "error.camera.multiSetupFailed" = "듀얼 카메라 설정 실패: %@";
 "error.camera.frontSetupFailed" = "전면 카메라 설정 실패: %@";
 "error.camera.backSetupFailed" = "후면 카메라 설정 실패: %@";
+"error.camera.startupTimeout" = "카메라 시작 시간이 초과되었습니다. 다시 시도하려면 탭하세요.";
+"error.camera.runtimeError" = "카메라에 런타임 오류가 발생했습니다.";
+"error.camera.interrupted" = "카메라 중단됨";
+"error.camera.interrupted.subtitle" = "중단이 끝나면 카메라가 자동으로 다시 시작됩니다.";
+"camera.unavailable.title" = "카메라를 사용할 수 없음";
+"camera.retry" = "다시 시도";
 "error.microphone.notFound" = "마이크를 찾을 수 없습니다.";
 "error.microphone.setupFailed" = "마이크 설정 실패: %@";
 

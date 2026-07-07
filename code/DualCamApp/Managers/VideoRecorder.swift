@@ -2105,7 +2105,36 @@ class VideoRecorder: ObservableObject {
             self.recordedDurationString = String(format: "%02d:%02d", minutes, seconds)
         }
     }
-    
+
+    /// Session 中断时安全停止录制，不等待 finishWriting 完成
+    func stopRecordingForInterruption() {
+        guard recordingState == .recording else { return }
+        recordingState = .stopping
+        isRecording = false
+        isNativeMovieRecordingActive = false
+
+        processingQueue.sync {}
+        mediaWritingQueue.sync {}
+
+        guard let assetWriter, startTime != nil else {
+            resetRecordingState()
+            return
+        }
+
+        if let videoInput, assetWriter.inputs.contains(where: { $0 === videoInput }) {
+            videoInput.markAsFinished()
+        }
+        if let audioInput, assetWriter.inputs.contains(where: { $0 === audioInput }) {
+            audioInput.markAsFinished()
+        }
+
+        if assetWriter.status == .writing {
+            assetWriter.finishWriting {}
+        }
+
+        resetRecordingState()
+    }
+
     @MainActor
     private func resetRecordingState() {
         recordingState = .idle
