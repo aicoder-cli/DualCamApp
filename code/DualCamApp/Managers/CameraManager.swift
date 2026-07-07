@@ -409,6 +409,7 @@ class CameraManager: NSObject, ObservableObject {
     @Published var rearFocalCapability = RearFocalCapability.fallback
     @Published var rearZoomFactor: CGFloat = 1
     @Published var isSessionInterrupted = false
+    @Published var sessionInterruptionReason: String?
 
     var rearLensStatus: RearLensStatus {
         rearFocalCapability.lensStatus(for: rearZoomFactor)
@@ -608,6 +609,7 @@ class CameraManager: NSObject, ObservableObject {
         didFinishStartupAttempt = false
         errorMessage = nil
         isSessionInterrupted = false
+        sessionInterruptionReason = nil
         hasAttemptedRuntimeErrorRecovery = false
         resetFirstFrameReadiness()
         defer { didFinishStartupAttempt = true }
@@ -817,6 +819,7 @@ class CameraManager: NSObject, ObservableObject {
     func restartSession() async {
         errorMessage = nil
         isSessionInterrupted = false
+        sessionInterruptionReason = nil
         hasAttemptedRuntimeErrorRecovery = false
         stopCapture()
         try? await Task.sleep(nanoseconds: 300_000_000)
@@ -833,12 +836,15 @@ class CameraManager: NSObject, ObservableObject {
                        name: .AVCaptureSessionInterruptionEnded, object: nil)
         nc.addObserver(self, selector: #selector(handleSessionRuntimeError(_:)),
                        name: .AVCaptureSessionRuntimeError, object: nil)
+        nc.addObserver(self, selector: #selector(handleAudioSessionInterruption(_:)),
+                       name: AVAudioSession.interruptionNotification, object: nil)
     }
 
     private func removeSessionObservers() {
         NotificationCenter.default.removeObserver(self, name: .AVCaptureSessionWasInterrupted, object: nil)
         NotificationCenter.default.removeObserver(self, name: .AVCaptureSessionInterruptionEnded, object: nil)
         NotificationCenter.default.removeObserver(self, name: .AVCaptureSessionRuntimeError, object: nil)
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
     }
 
     private func startStartupTimeout() {
@@ -864,15 +870,36 @@ class CameraManager: NSObject, ObservableObject {
               reason == .videoDeviceNotAvailableInBackground || reason == .videoDeviceNotAvailableDueToSystemPressure || reason == .videoDeviceInUseByAnotherClient else {
             return
         }
+
+        let reasonKey: String
+        switch reason {
+        case .videoDeviceNotAvailableDueToSystemPressure:
+            // Usually a phone call — both camera and mic are taken by the system
+            reasonKey = "error.camera.interrupted.inCall"
+        case .videoDeviceInUseByAnotherClient:
+            // Another app is using the camera; check if mic is also occupied
+            if AVAudioSession.sharedInstance().isOtherAudioPlaying {
+                reasonKey = "error.camera.interrupted.inCall"
+            } else {
+                reasonKey = "error.camera.interrupted.cameraInUse"
+            }
+        case .videoDeviceNotAvailableInBackground:
+            reasonKey = "error.camera.interrupted.inCall"
+        default:
+            reasonKey = "error.camera.interrupted.inCall"
+        }
+
         let handler = sessionInterruptionHandler
         Task { @MainActor in
             handler?()
+            sessionInterruptionReason = reasonKey
             isSessionInterrupted = true
         }
     }
 
     @objc private func handleSessionInterruptionEnded(_ notification: Notification) {
         isSessionInterrupted = false
+        sessionInterruptionReason = nil
         Task<Void, Never> { @MainActor [weak self] in
             guard let self else { return }
             self.resetFirstFrameReadiness()
@@ -924,6 +951,26 @@ class CameraManager: NSObject, ObservableObject {
         } else {
             errorMessage = L10n.string("error.camera.runtimeError")
             didFinishStartupAttempt = true
+        }
+    }
+
+    @objc private func handleAudioSessionInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+
+        if type == .began {
+            // Mic was taken by another app (e.g., phone call)
+            let reasonKey = "error.camera.interrupted.inCall"
+            let handler = sessionInterruptionHandler
+            Task { @MainActor in
+                handler?()
+                sessionInterruptionReason = reasonKey
+                isSessionInterrupted = true
+            }
+        } else if type == .ended {
+            // Audio interruption ended — the video session interruptionEnded
+            // handler will take care of restarting the camera session
         }
     }
 

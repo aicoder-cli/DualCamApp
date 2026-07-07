@@ -138,6 +138,9 @@
 "error.camera.runtimeError" = "鏡頭遇到執行時期錯誤。";
 "error.camera.interrupted" = "鏡頭已中斷";
 "error.camera.interrupted.subtitle" = "中斷結束後鏡頭將自動恢復。";
+"error.camera.interrupted.inCall" = "通話中暫時無法使用";
+"error.camera.interrupted.cameraInUse" = "鏡頭正被其他應用程式使用";
+"error.camera.interrupted.micInUse" = "麥克風正被其他應用程式使用";
 "camera.unavailable.title" = "鏡頭不可用";
 "camera.retry" = "重試";
 "error.microphone.notFound" = "找不到麥克風。";

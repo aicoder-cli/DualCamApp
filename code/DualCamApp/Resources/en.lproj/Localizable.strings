@@ -138,6 +138,9 @@
 "error.camera.runtimeError" = "Camera encountered a runtime error.";
 "error.camera.interrupted" = "Camera interrupted";
 "error.camera.interrupted.subtitle" = "The camera will restart automatically when the interruption ends.";
+"error.camera.interrupted.inCall" = "In call, temporarily unavailable";
+"error.camera.interrupted.cameraInUse" = "Camera is in use by another app";
+"error.camera.interrupted.micInUse" = "Microphone is in use by another app";
 "camera.unavailable.title" = "Camera Unavailable";
 "camera.retry" = "Retry";
 "error.microphone.notFound" = "Microphone not found.";

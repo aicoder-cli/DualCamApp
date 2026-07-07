@@ -240,7 +240,7 @@ struct ContentView: View {
                     )
                     .transition(.opacity)
                 } else if cameraManager.isSessionInterrupted {
-                    CameraInterruptedOverlay()
+                    CameraInterruptedOverlay(reasonKey: cameraManager.sessionInterruptionReason)
                         .transition(.opacity)
                 } else if let error = cameraManager.errorMessage ?? videoRecorder.errorMessage {
                     ErrorBanner(message: error) {
@@ -1700,16 +1700,18 @@ private struct CameraFailureOverlay: View {
 }
 
 private struct CameraInterruptedOverlay: View {
+    let reasonKey: String?
+
     var body: some View {
         ZStack {
             Design.background.opacity(0.88).ignoresSafeArea()
 
             VStack(spacing: 16) {
-                Image(systemName: "phone.fill.arrow.right")
+                Image(systemName: iconName)
                     .font(.system(size: 40))
                     .foregroundColor(.orange)
 
-                Text(L10n.string("error.camera.interrupted"))
+                Text(L10n.string(reasonKey ?? "error.camera.interrupted"))
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
 
@@ -1720,6 +1722,17 @@ private struct CameraInterruptedOverlay: View {
                     .frame(maxWidth: 260)
                     .lineSpacing(2)
             }
+        }
+    }
+
+    private var iconName: String {
+        switch reasonKey {
+        case "error.camera.interrupted.cameraInUse":
+            return "video.slash"
+        case "error.camera.interrupted.micInUse":
+            return "mic.slash"
+        default:
+            return "phone.fill.arrow.right"
         }
     }
 }
