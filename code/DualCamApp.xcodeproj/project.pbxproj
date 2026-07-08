@@ -31,6 +31,10 @@
 		A11111110000000000000114 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000016 /* SettingsView.swift */; };
 		A11111110000000000000115 /* WorksPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000017 /* WorksPresentation.swift */; };
 		A11111110000000000000116 /* CaptureFeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000018 /* CaptureFeedbackService.swift */; };
+		A1111111000000000000011C /* TeleprompterScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000031 /* TeleprompterScript.swift */; };
+		A1111111000000000000011D /* ScriptGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000032 /* ScriptGenerator.swift */; };
+		A1111111000000000000011E /* TeleprompterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000033 /* TeleprompterView.swift */; };
+		A1111111000000000000011F /* ScriptEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000034 /* ScriptEditorView.swift */; };
 		A11111110000000000000117 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000008 /* Assets.xcassets */; };
 		A11111110000000000000118 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A1222222000000000000000E /* Localizable.strings */; };
 		A11111110000000000000119 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A12222220000000000000012 /* InfoPlist.strings */; };
@@ -78,6 +82,10 @@
 		A12222220000000000000016 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A12222220000000000000017 /* WorksPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorksPresentation.swift; sourceTree = "<group>"; };
 		A12222220000000000000018 /* CaptureFeedbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFeedbackService.swift; sourceTree = "<group>"; };
+		A12222220000000000000031 /* TeleprompterScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeleprompterScript.swift; sourceTree = "<group>"; };
+		A12222220000000000000032 /* ScriptGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptGenerator.swift; sourceTree = "<group>"; };
+		A12222220000000000000033 /* TeleprompterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeleprompterView.swift; sourceTree = "<group>"; };
+		A12222220000000000000034 /* ScriptEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptEditorView.swift; sourceTree = "<group>"; };
 		A12222220000000000000020 /* DualCamAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DualCamAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A12222220000000000000021 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		A12222220000000000000022 /* LayoutManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutManagerTests.swift; sourceTree = "<group>"; };
@@ -159,6 +167,8 @@
 				A12222220000000000000013 /* WorksManager.swift */,
 				A12222220000000000000017 /* WorksPresentation.swift */,
 				A12222220000000000000018 /* CaptureFeedbackService.swift */,
+				A12222220000000000000031 /* TeleprompterScript.swift */,
+				A12222220000000000000032 /* ScriptGenerator.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -172,6 +182,8 @@
 				A12222220000000000000007 /* LayoutSelectorView.swift */,
 				A12222220000000000000014 /* WorksView.swift */,
 				A12222220000000000000016 /* SettingsView.swift */,
+				A12222220000000000000033 /* TeleprompterView.swift */,
+				A12222220000000000000034 /* ScriptEditorView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -327,6 +339,10 @@
 				A11111110000000000000114 /* SettingsView.swift in Sources */,
 				A11111110000000000000115 /* WorksPresentation.swift in Sources */,
 				A11111110000000000000116 /* CaptureFeedbackService.swift in Sources */,
+				A1111111000000000000011C /* TeleprompterScript.swift in Sources */,
+				A1111111000000000000011D /* ScriptGenerator.swift in Sources */,
+				A1111111000000000000011E /* TeleprompterView.swift in Sources */,
+				A1111111000000000000011F /* ScriptEditorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
