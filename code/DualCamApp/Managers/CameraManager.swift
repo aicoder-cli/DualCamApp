@@ -220,6 +220,10 @@ nonisolated struct RearFocalCapability: Equatable {
         min(max(zoomFactor, minZoomFactor), maxZoomFactor)
     }
 
+    var defaultExperienceZoomFactor: CGFloat {
+        clampedZoomFactor(1)
+    }
+
     func lensStatus(for zoomFactor: CGFloat) -> RearLensStatus {
         let clampedZoom = clampedZoomFactor(zoomFactor)
         if let exactZoom = physicalLensByZoom.keys.first(where: { abs($0 - clampedZoom) < 0.01 }),

@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-08 - Video composition framing and rear focal stability
+
+### Fixed
+
+- Fixed severe rear-camera cropping and irregular black regions in recorded videos by drawing the rear layer with the same fill behavior as the live preview.
+- Stopped clipping the rear-camera recording layout before compositing so oversized safe-frame mappings render consistently instead of exposing black background.
+- Fixed preview/recording mismatches by using the recording safe frame as the shared composition viewport for all six layouts.
+- Fixed rear focal startup persistence so automatic camera-session zoom updates do not overwrite the user's explicit focal choice.
+- Restored the default rear focal startup behavior to 1× while preserving user-selected focal lengths across relaunches.
+
+### Added
+
+- Added safe-viewport layout snapshot coverage for all six layout modes.
+- Added rear focal preference strategy tests for default 1× behavior, explicit user choice restoration, and hardware capability clamping.
+- Added video composition layer-spec tests to ensure front and rear layers both use aspect fill and preserve the unclipped rear layout frame.
+
+### Verified
+
+- Real-device validation confirmed all six video layouts record normally after the composition and safe-frame fixes.
+- Real-device validation confirmed new installs start at 1× and relaunches preserve the expected rear focal behavior.
+- `xcodebuild -project ./DualCamApp/code/DualCamApp.xcodeproj -scheme DualCamApp -destination 'generic/platform=iOS' build` completed successfully.
+- `xcodebuild -project ./DualCamApp/code/DualCamApp.xcodeproj -scheme DualCamApp -destination 'generic/platform=iOS' build-for-testing` completed successfully.
+
 ## 2026-06-22 - Rear camera native FOV and photo quality
 
 ### Changed

@@ -135,14 +135,51 @@ final class LayoutManagerTests: XCTestCase {
         assertRecordingSnapshotScales(outputSize: CGSize(width: 1080, height: 1440))
     }
 
-    func testSafeSourceFrameSnapshotAvoidsLetterboxing() {
-        let manager = makeManager(layout: .pictureInPicture)
-        let safeFrame = CGRect(x: 0, y: 162, width: 390, height: 520)
+    func testSafeViewportRecordingSnapshotFillsOutput() {
+        let manager = makeManager(layout: .pictureInPicture, containerSize: CGSize(width: 390, height: 520))
 
-        let snapshot = manager.makeRecordingLayoutSnapshot(outputSize: CGSize(width: 1080, height: 1440), sourceFrame: safeFrame)
+        let snapshot = manager.makeRecordingLayoutSnapshot(outputSize: CGSize(width: 1080, height: 1440))
 
-        TestSupport.assertRect(snapshot.back.frame, CGRect(x: 0, y: -448.6153846153846, width: 1080, height: 2337.230769230769), accuracy: 0.001)
+        TestSupport.assertRect(snapshot.back.frame, CGRect(x: 0, y: 0, width: 1080, height: 1440), accuracy: 0.001)
         XCTAssertEqual(snapshot.outputSize, CGSize(width: 1080, height: 1440))
+    }
+
+    func testRecordingSnapshotMatchesSafeViewportPreviewLayoutsForAllLayouts() {
+        let viewportSize = CGSize(width: 390, height: 520)
+        let outputSize = CGSize(width: 1080, height: 1440)
+        let scale = outputSize.width / viewportSize.width
+
+        for layout in LayoutType.allCases {
+            let manager = makeManager(layout: layout, containerSize: viewportSize)
+            let frontBefore = manager.getFrontCameraLayout()
+            let backBefore = manager.getBackCameraLayout()
+
+            let snapshot = manager.makeRecordingLayoutSnapshot(outputSize: outputSize)
+
+            XCTAssertEqual(snapshot.outputSize, outputSize)
+            assertScaled(snapshot.front, from: frontBefore, scale: scale, origin: .zero)
+            assertScaled(snapshot.back, from: backBefore, scale: scale, origin: .zero)
+        }
+    }
+
+    func testSafeViewportSplitAndDiagonalLayoutsMapToOutput() {
+        let viewportSize = CGSize(width: 390, height: 520)
+        let outputSize = CGSize(width: 1080, height: 1440)
+
+        let splitVertical = makeManager(layout: .splitVertical, containerSize: viewportSize)
+        let splitVerticalSnapshot = splitVertical.makeRecordingLayoutSnapshot(outputSize: outputSize)
+        TestSupport.assertRect(splitVerticalSnapshot.front.frame, CGRect(x: 0, y: 0, width: 540, height: 1440))
+        TestSupport.assertRect(splitVerticalSnapshot.back.frame, CGRect(x: 540, y: 0, width: 540, height: 1440))
+
+        let splitHorizontal = makeManager(layout: .splitHorizontal, containerSize: viewportSize)
+        let splitHorizontalSnapshot = splitHorizontal.makeRecordingLayoutSnapshot(outputSize: outputSize)
+        TestSupport.assertRect(splitHorizontalSnapshot.back.frame, CGRect(x: 0, y: 0, width: 1080, height: 720))
+        TestSupport.assertRect(splitHorizontalSnapshot.front.frame, CGRect(x: 0, y: 720, width: 1080, height: 720))
+
+        let diagonal = makeManager(layout: .diagonalCut, containerSize: viewportSize)
+        let diagonalSnapshot = diagonal.makeRecordingLayoutSnapshot(outputSize: outputSize)
+        TestSupport.assertRect(diagonalSnapshot.front.frame, CGRect(x: 0, y: 0, width: 1080, height: 1440))
+        TestSupport.assertRect(diagonalSnapshot.back.frame, CGRect(x: 0, y: 0, width: 1080, height: 1440))
     }
 
     private func assertRecordingSnapshotScales(outputSize: CGSize, file: StaticString = #filePath, line: UInt = #line) {
@@ -161,9 +198,9 @@ final class LayoutManagerTests: XCTestCase {
         assertScaled(snapshot.back, from: backBefore, scale: scale, origin: origin, file: file, line: line)
     }
 
-    private func makeManager(layout: LayoutType) -> LayoutManager {
+    private func makeManager(layout: LayoutType, containerSize: CGSize = CGSize(width: 390, height: 844)) -> LayoutManager {
         let manager = LayoutManager()
-        manager.containerSize = CGSize(width: 390, height: 844)
+        manager.containerSize = containerSize
         manager.currentLayout = layout
         return manager
     }

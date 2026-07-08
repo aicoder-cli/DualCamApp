@@ -18,6 +18,7 @@ enum SettingsKey {
     static let recordingCountdownSeconds = "recordingCountdownSeconds"
     static let soundAndHapticsEnabled = "soundAndHapticsEnabled"
     static let lastRearFocalLength = "lastRearFocalLength"
+    static let hasChosenRearFocalLength = "hasChosenRearFocalLength"
     static let saveToSystemPhotos = "saveToSystemPhotos"
     static let keepOriginalStreams = "keepOriginalStreams"
     static let workNamingRule = "workNamingRule"
@@ -54,12 +55,30 @@ enum AppSettings {
             SettingsKey.recordingCountdownSeconds: RecordingCountdown.off.rawValue,
             SettingsKey.soundAndHapticsEnabled: true,
             SettingsKey.lastRearFocalLength: 1.0,
+            SettingsKey.hasChosenRearFocalLength: false,
             SettingsKey.saveToSystemPhotos: false,
             SettingsKey.keepOriginalStreams: false,
             SettingsKey.workNamingRule: WorkNamingRule.dateLayout.rawValue,
             SettingsKey.workNamingSequence: 1,
             SettingsKey.autoClearCache: false
         ])
+    }
+}
+
+nonisolated enum RearFocalPreference {
+    static func preferredZoomFactor(
+        hasChosenRearFocalLength: Bool,
+        lastRearFocalLength: Double,
+        capability: RearFocalCapability
+    ) -> CGFloat {
+        if hasChosenRearFocalLength {
+            return capability.clampedZoomFactor(CGFloat(lastRearFocalLength))
+        }
+        return capability.defaultExperienceZoomFactor
+    }
+
+    static func storedFocalLength(afterApplying zoomFactor: CGFloat) -> Double {
+        Double(zoomFactor)
     }
 }
 
