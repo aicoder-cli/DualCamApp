@@ -39,6 +39,7 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(userDefaults.integer(forKey: SettingsKey.recordingCountdownSeconds), RecordingCountdown.off.rawValue)
         XCTAssertTrue(userDefaults.bool(forKey: SettingsKey.soundAndHapticsEnabled))
         XCTAssertEqual(userDefaults.double(forKey: SettingsKey.lastRearFocalLength), 1.0)
+        XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.hasChosenRearFocalLength))
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.saveToSystemPhotos))
         XCTAssertFalse(userDefaults.bool(forKey: SettingsKey.keepOriginalStreams))
         XCTAssertEqual(userDefaults.string(forKey: SettingsKey.workNamingRule), WorkNamingRule.dateLayout.rawValue)
@@ -200,5 +201,100 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertEqual(RearFocalCapability.formattedZoomFactor(0.5), "0.5×")
         XCTAssertEqual(RearFocalCapability.formattedZoomFactor(1), "1×")
         XCTAssertEqual(RearFocalCapability.formattedZoomFactor(2.3), "2.3×")
+    }
+
+    func testRearFocalPreferenceUsesDefaultWhenUserHasNotChosen() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 0.5,
+            maxZoomFactor: 15,
+            physicalLensByZoom: [0.5: .ultra, 1: .wide, 3: .tele]
+        )
+
+        XCTAssertEqual(
+            RearFocalPreference.preferredZoomFactor(
+                hasChosenRearFocalLength: false,
+                lastRearFocalLength: 0.5,
+                capability: capability
+            ),
+            1
+        )
+    }
+
+    func testRearFocalPreferenceRestoresUserChoice() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 0.5,
+            maxZoomFactor: 15,
+            physicalLensByZoom: [0.5: .ultra, 1: .wide, 3: .tele]
+        )
+
+        XCTAssertEqual(
+            RearFocalPreference.preferredZoomFactor(
+                hasChosenRearFocalLength: true,
+                lastRearFocalLength: 0.5,
+                capability: capability
+            ),
+            0.5
+        )
+    }
+
+    func testRearFocalPreferenceClampsStoredUserChoice() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 1,
+            maxZoomFactor: 3,
+            physicalLensByZoom: [1: .wide]
+        )
+
+        XCTAssertEqual(
+            RearFocalPreference.preferredZoomFactor(
+                hasChosenRearFocalLength: true,
+                lastRearFocalLength: 0.5,
+                capability: capability
+            ),
+            1
+        )
+    }
+
+    func testRearFocalPreferenceStoresAppliedZoomFactor() {
+        XCTAssertEqual(RearFocalPreference.storedFocalLength(afterApplying: 2.5), 2.5)
+    }
+
+    func testRearFocalCapabilityDefaultsToOneTimesWhenUltraWideIsAvailable() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 0.5,
+            maxZoomFactor: 15,
+            physicalLensByZoom: [0.5: .ultra, 1: .wide, 3: .tele]
+        )
+
+        XCTAssertEqual(capability.defaultExperienceZoomFactor, 1)
+    }
+
+    func testRearFocalCapabilityDefaultFallsBackToWide() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 1,
+            maxZoomFactor: 3,
+            physicalLensByZoom: [1: .wide]
+        )
+
+        XCTAssertEqual(capability.defaultExperienceZoomFactor, 1)
+    }
+
+    func testRearFocalCapabilityDefaultClampsWhenOneTimesUnavailable() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 1.5,
+            maxZoomFactor: 3,
+            physicalLensByZoom: [2: .tele]
+        )
+
+        XCTAssertEqual(capability.defaultExperienceZoomFactor, 1.5)
+    }
+
+    func testRearFocalCapabilityDefaultDoesNotPreferSubOneNonUltraZoom() {
+        let capability = RearFocalCapability(
+            minZoomFactor: 0.8,
+            maxZoomFactor: 3,
+            physicalLensByZoom: [0.8: .wide, 1: .wide]
+        )
+
+        XCTAssertEqual(capability.defaultExperienceZoomFactor, 1)
     }
 }

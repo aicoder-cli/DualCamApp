@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreGraphics
 import XCTest
 @testable import DualCamApp
 
@@ -58,6 +59,36 @@ final class LivePhotoAudioTimingTests: XCTestCase {
         XCTAssertTrue(VideoRecorder.isAudioSample(presentationTime: CMTime(seconds: 11.0, preferredTimescale: 600), within: range))
         XCTAssertTrue(VideoRecorder.isAudioSample(presentationTime: captureEndTime, within: range))
         XCTAssertFalse(VideoRecorder.isAudioSample(presentationTime: CMTime(seconds: 12.01, preferredTimescale: 600), within: range))
+    }
+
+    func testCompositeLayerSpecsUseAspectFillForBothCameras() {
+        let snapshot = makeLayoutSnapshot(
+            front: CameraLayoutInfo(frame: CGRect(x: 80, y: 120, width: 240, height: 320), zIndex: 2, cornerRadius: 24, showBorder: true, clipShape: .roundedRectangle),
+            back: CameraLayoutInfo(frame: CGRect(x: 0, y: 0, width: 1080, height: 1920), zIndex: 1, cornerRadius: 0, showBorder: false, clipShape: .rectangle)
+        )
+
+        let specs = VideoRecorder.compositeLayerSpecs(for: snapshot)
+
+        XCTAssertEqual(specs.map(\.role), [.back, .front])
+        XCTAssertEqual(specs.map(\.contentMode), [.aspectFill, .aspectFill])
+    }
+
+    func testCompositeLayerSpecsPreserveUnclippedBackLayout() {
+        let backLayout = CameraLayoutInfo(frame: CGRect(x: 0, y: -448.6, width: 1080, height: 2337.2), zIndex: 1, cornerRadius: 0, showBorder: false, clipShape: .rectangle)
+        let snapshot = makeLayoutSnapshot(
+            front: CameraLayoutInfo(frame: CGRect(x: 700, y: 1200, width: 260, height: 346), zIndex: 2, cornerRadius: 24, showBorder: true, clipShape: .roundedRectangle),
+            back: backLayout
+        )
+
+        let specs = VideoRecorder.compositeLayerSpecs(for: snapshot)
+        let backSpec = specs.first { $0.role == .back }
+
+        XCTAssertEqual(backSpec?.layout, backLayout)
+        XCTAssertEqual(backSpec?.contentMode, .aspectFill)
+    }
+
+    private func makeLayoutSnapshot(front: CameraLayoutInfo, back: CameraLayoutInfo) -> RecordingLayoutSnapshot {
+        RecordingLayoutSnapshot(front: front, back: back, outputSize: CGSize(width: 1080, height: 1920))
     }
 
     private func makeAudioSampleBuffer(

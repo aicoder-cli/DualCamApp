@@ -144,46 +144,68 @@ struct DualCameraPreviewContainer: View {
     @ObservedObject var cameraManager: CameraManager
     @ObservedObject var layoutManager: LayoutManager
     var didFinishStartupAttempt = false
+    var compositionFrame: CGRect? = nil
 
     var body: some View {
         GeometryReader { geometry in
+            let effectiveFrame = effectiveCompositionFrame(in: geometry.size)
+
             ZStack {
                 previewBackdrop
 
-                if cameraManager.backCameraReady {
-                    DemoCameraLayer(
-                        previewLayer: cameraManager.getBackPreviewLayer(),
-                        layoutInfo: layoutManager.getBackCameraLayout(),
-                        cameraType: .back,
-                        layoutManager: layoutManager
-                    )
-                }
+                ZStack {
+                    if cameraManager.backCameraReady {
+                        DemoCameraLayer(
+                            previewLayer: cameraManager.getBackPreviewLayer(),
+                            layoutInfo: layoutManager.getBackCameraLayout(),
+                            cameraType: .back,
+                            layoutManager: layoutManager
+                        )
+                    }
 
-                if cameraManager.frontCameraReady {
-                    DemoCameraLayer(
-                        previewLayer: cameraManager.getFrontPreviewLayer(),
-                        layoutInfo: layoutManager.getFrontCameraLayout(),
-                        cameraType: .front,
-                        layoutManager: layoutManager
-                    )
-                }
+                    if cameraManager.frontCameraReady {
+                        DemoCameraLayer(
+                            previewLayer: cameraManager.getFrontPreviewLayer(),
+                            layoutInfo: layoutManager.getFrontCameraLayout(),
+                            cameraType: .front,
+                            layoutManager: layoutManager
+                        )
+                    }
 
-                if !cameraManager.frontCameraReady && !cameraManager.backCameraReady {
-                    if didFinishStartupAttempt {
-                        CameraUnavailableView()
-                    } else {
-                        WaitingCameraView()
+                    if !cameraManager.frontCameraReady && !cameraManager.backCameraReady {
+                        if didFinishStartupAttempt {
+                            CameraUnavailableView()
+                        } else {
+                            WaitingCameraView()
+                        }
                     }
                 }
+                .frame(width: effectiveFrame.width, height: effectiveFrame.height)
+                .clipped()
+                .position(x: effectiveFrame.midX, y: effectiveFrame.midY)
             }
-            .clipped()
             .onAppear {
-                layoutManager.containerSize = geometry.size
+                updateLayoutContainerSize(effectiveFrame.size)
             }
-            .onChange(of: geometry.size) { newSize in
-                layoutManager.containerSize = newSize
+            .onChange(of: effectiveFrame.size) { newSize in
+                updateLayoutContainerSize(newSize)
             }
         }
+    }
+
+    private func effectiveCompositionFrame(in containerSize: CGSize) -> CGRect {
+        if let compositionFrame,
+           compositionFrame.width > 0,
+           compositionFrame.height > 0 {
+            return compositionFrame
+        }
+        return CGRect(origin: .zero, size: containerSize)
+    }
+
+    private func updateLayoutContainerSize(_ size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        guard layoutManager.containerSize != size else { return }
+        layoutManager.containerSize = size
     }
 
     private var previewBackdrop: some View {

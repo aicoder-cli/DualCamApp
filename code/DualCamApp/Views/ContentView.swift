@@ -99,6 +99,7 @@ struct ContentView: View {
     @AppStorage(SettingsKey.recordingCountdownSeconds) private var recordingCountdownSeconds = RecordingCountdown.off.rawValue
     @AppStorage(SettingsKey.soundAndHapticsEnabled) private var soundAndHapticsEnabled = true
     @AppStorage(SettingsKey.lastRearFocalLength) private var lastRearFocalLength: Double = 1.0
+    @AppStorage(SettingsKey.hasChosenRearFocalLength) private var hasChosenRearFocalLength = false
     @AppStorage(SettingsKey.autoClearCache) private var autoClearCache = false
 
     private var isVideoRecording: Bool {
@@ -289,8 +290,7 @@ struct ContentView: View {
             Task<Void, Never> {
                 await cameraManager.setPreferredFrameRate(Int32(frameRate))
                 await cameraManager.startCapture()
-                cameraManager.setRearZoomFactor(1.0)
-                lastRearFocalLength = 1.0
+                applyPreferredRearFocalLength()
             }
             Task<Void, Never> {
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
@@ -315,11 +315,10 @@ struct ContentView: View {
         .onChange(of: videoCodecRaw) { _ in
             applyMediaOutputSpec()
         }
-        .onChange(of: cameraManager.rearZoomFactor) { zoomFactor in
-            lastRearFocalLength = Double(zoomFactor)
-        }
         .onChange(of: cameraManager.backCameraReady) { isReady in
-            if !isReady {
+            if isReady {
+                applyPreferredRearFocalLength()
+            } else {
                 videoRecorder.clearBackFrameBuffer()
             }
         }
@@ -398,6 +397,7 @@ struct ContentView: View {
                 Task<Void, Never> {
                     if !cameraManager.isSessionRunning {
                         await cameraManager.startCapture()
+                        applyPreferredRearFocalLength()
                     }
                 }
             case .inactive, .background:
@@ -472,14 +472,17 @@ struct ContentView: View {
     }
 
     private func previewCard(size: CGSize) -> some View {
-        ZStack(alignment: .topLeading) {
+        let safeFrame = makeRecordingSafeFrame(in: size, outputSize: activeOutputSize)
+
+        return ZStack(alignment: .topLeading) {
             DualCameraPreviewContainer(
                 cameraManager: cameraManager,
                 layoutManager: layoutManager,
-                didFinishStartupAttempt: cameraManager.didFinishStartupAttempt
+                didFinishStartupAttempt: cameraManager.didFinishStartupAttempt,
+                compositionFrame: safeFrame
             )
             .frame(width: size.width, height: size.height)
-            .mask(OutputSafeFrameMask(frame: makeRecordingSafeFrame(in: size, outputSize: activeOutputSize)))
+            .mask(OutputSafeFrameMask(frame: safeFrame))
 
             if showsRecordingChrome {
                 VStack(alignment: .leading, spacing: 4) {
@@ -507,7 +510,7 @@ struct ContentView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            OutputSafeFrameOverlay(frame: makeRecordingSafeFrame(in: size, outputSize: activeOutputSize), isVisible: showsRecordingChrome)
+            OutputSafeFrameOverlay(frame: safeFrame, isVisible: showsRecordingChrome)
                 .allowsHitTesting(false)
 
             if isImmersiveRecordingActive && !recordingControlsRevealed {
@@ -518,7 +521,7 @@ struct ContentView: View {
                     .padding(.vertical, 8)
                     .background(Capsule().fill(Color.black.opacity(0.42)))
                     .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
-                    .position(x: size.width / 2, y: max(24, makeRecordingSafeFrame(in: size, outputSize: activeOutputSize).minY - 18))
+                    .position(x: size.width / 2, y: max(24, safeFrame.minY - 18))
                     .transition(.opacity)
             }
 
@@ -577,9 +580,20 @@ struct ContentView: View {
         scheduleRearFocalPickerHide()
     }
 
-    private func setRearFocalLength(_ zoomFactor: CGFloat) {
+    private func applyPreferredRearFocalLength() {
+        let zoomFactor = RearFocalPreference.preferredZoomFactor(
+            hasChosenRearFocalLength: hasChosenRearFocalLength,
+            lastRearFocalLength: lastRearFocalLength,
+            capability: cameraManager.rearFocalCapability
+        )
         cameraManager.setRearZoomFactor(zoomFactor)
-        lastRearFocalLength = Double(cameraManager.rearZoomFactor)
+        lastRearFocalLength = RearFocalPreference.storedFocalLength(afterApplying: cameraManager.rearZoomFactor)
+    }
+
+    private func setRearFocalLength(_ zoomFactor: CGFloat) {
+        hasChosenRearFocalLength = true
+        cameraManager.setRearZoomFactor(zoomFactor)
+        lastRearFocalLength = RearFocalPreference.storedFocalLength(afterApplying: cameraManager.rearZoomFactor)
         withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
             isRearFocalPickerPresented = true
         }
@@ -854,10 +868,18 @@ struct ContentView: View {
         )
     }
 
+    private func syncRecordingLayoutViewportIfNeeded() {
+        guard previewSize.width > 0, previewSize.height > 0 else { return }
+        let safeSize = recordingSafeFrame.size
+        guard safeSize.width > 0, safeSize.height > 0 else { return }
+        guard layoutManager.containerSize != safeSize else { return }
+        layoutManager.containerSize = safeSize
+    }
+
     @discardableResult
     private func updateRecordingLayoutSnapshot() -> RecordingLayoutSnapshot {
-        let sourceFrame = previewSize == .zero ? nil : recordingSafeFrame
-        let snapshot = layoutManager.makeRecordingLayoutSnapshot(outputSize: activeOutputSize, sourceFrame: sourceFrame)
+        syncRecordingLayoutViewportIfNeeded()
+        let snapshot = layoutManager.makeRecordingLayoutSnapshot(outputSize: activeOutputSize)
         videoRecorder.updateLayoutSnapshot(snapshot)
         videoRecorder.updateNativeMovieRecordingLayout(snapshot)
         videoRecorder.updateWorkLayout(layoutManager.currentLayout)

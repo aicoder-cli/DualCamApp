@@ -21,6 +21,22 @@ enum RecordingState {
     case saving
 }
 
+nonisolated enum VideoCompositeLayerRole: Equatable {
+    case back
+    case front
+}
+
+nonisolated enum VideoCompositeContentMode: Equatable {
+    case aspectFill
+    case aspectFit
+}
+
+nonisolated struct VideoCompositeLayerSpec: Equatable {
+    let role: VideoCompositeLayerRole
+    let layout: CameraLayoutInfo
+    let contentMode: VideoCompositeContentMode
+}
+
 /// 视频录制器
 class VideoRecorder: ObservableObject {
     
@@ -95,9 +111,11 @@ class VideoRecorder: ObservableObject {
         let presentationTime: CMTime?
     }
 
-    private enum LayerContentMode {
-        case aspectFill
-        case aspectFit
+    static func compositeLayerSpecs(for layoutSnapshot: RecordingLayoutSnapshot) -> [VideoCompositeLayerSpec] {
+        [
+            VideoCompositeLayerSpec(role: .back, layout: layoutSnapshot.back, contentMode: .aspectFill),
+            VideoCompositeLayerSpec(role: .front, layout: layoutSnapshot.front, contentMode: .aspectFill)
+        ].sorted { $0.layout.zIndex < $1.layout.zIndex }
     }
 
     private struct LivePhotoBufferedFrame {
@@ -1617,13 +1635,14 @@ class VideoRecorder: ObservableObject {
 
         if let backBuffer,
            let backImage = sourceCGImage(from: backBuffer) {
-            let layers = [
-                (image: backImage, layout: outputVisibleLayout(layoutSnapshot.back, outputSize: outputSize), contentMode: LayerContentMode.aspectFit),
-                (image: frontImage, layout: layoutSnapshot.front, contentMode: .aspectFill)
-            ].sorted { $0.layout.zIndex < $1.layout.zIndex }
+            let imagesByRole: [VideoCompositeLayerRole: CGImage] = [
+                .back: backImage,
+                .front: frontImage
+            ]
 
-            for layer in layers {
-                draw(layer.image, sourceSize: CGSize(width: layer.image.width, height: layer.image.height), layout: layer.layout, contentMode: layer.contentMode, in: context)
+            for layer in Self.compositeLayerSpecs(for: layoutSnapshot) {
+                guard let image = imagesByRole[layer.role] else { continue }
+                draw(image, sourceSize: CGSize(width: image.width, height: image.height), layout: layer.layout, contentMode: layer.contentMode, in: context)
             }
         } else {
             let fullFrameLayout = CameraLayoutInfo(
@@ -1719,7 +1738,7 @@ class VideoRecorder: ObservableObject {
         }
     }
 
-    private func draw(_ image: CGImage, sourceSize: CGSize, layout: CameraLayoutInfo, contentMode: LayerContentMode = .aspectFill, in context: CGContext) {
+    private func draw(_ image: CGImage, sourceSize: CGSize, layout: CameraLayoutInfo, contentMode: VideoCompositeContentMode = .aspectFill, in context: CGContext) {
         context.saveGState()
         defer { context.restoreGState() }
 
@@ -1793,13 +1812,14 @@ class VideoRecorder: ObservableObject {
         UIRectFill(CGRect(origin: .zero, size: layoutSnapshot.outputSize))
 
         if let back {
-            let layers = [
-                (image: back, layout: outputVisibleLayout(layoutSnapshot.back, outputSize: layoutSnapshot.outputSize), contentMode: LayerContentMode.aspectFit),
-                (image: front, layout: layoutSnapshot.front, contentMode: .aspectFill)
-            ].sorted { $0.layout.zIndex < $1.layout.zIndex }
+            let imagesByRole: [VideoCompositeLayerRole: UIImage] = [
+                .back: back,
+                .front: front
+            ]
 
-            for layer in layers {
-                draw(layer.image, layout: layer.layout, contentMode: layer.contentMode)
+            for layer in Self.compositeLayerSpecs(for: layoutSnapshot) {
+                guard let image = imagesByRole[layer.role] else { continue }
+                draw(image, layout: layer.layout, contentMode: layer.contentMode)
             }
         } else {
             front.draw(in: CGRect(origin: .zero, size: layoutSnapshot.outputSize))
@@ -1808,7 +1828,7 @@ class VideoRecorder: ObservableObject {
         return UIGraphicsGetImageFromCurrentImageContext()
     }
 
-    private func draw(_ image: UIImage, layout: CameraLayoutInfo, contentMode: LayerContentMode = .aspectFill) {
+    private func draw(_ image: UIImage, layout: CameraLayoutInfo, contentMode: VideoCompositeContentMode = .aspectFill) {
         let rect = layout.frame
         guard let context = UIGraphicsGetCurrentContext() else {
             image.draw(in: aspectRect(for: image.size, in: rect, contentMode: contentMode))
@@ -1845,21 +1865,7 @@ class VideoRecorder: ObservableObject {
         context.restoreGState()
     }
 
-    private func outputVisibleLayout(_ layout: CameraLayoutInfo, outputSize: CGSize) -> CameraLayoutInfo {
-        let outputRect = CGRect(origin: .zero, size: outputSize)
-        let visibleFrame = layout.frame.intersection(outputRect)
-        guard !visibleFrame.isNull, visibleFrame.width > 0, visibleFrame.height > 0 else { return layout }
-
-        return CameraLayoutInfo(
-            frame: visibleFrame,
-            zIndex: layout.zIndex,
-            cornerRadius: layout.cornerRadius,
-            showBorder: layout.showBorder,
-            clipShape: layout.clipShape
-        )
-    }
-
-    private func aspectRect(for imageSize: CGSize, in rect: CGRect, contentMode: LayerContentMode) -> CGRect {
+    private func aspectRect(for imageSize: CGSize, in rect: CGRect, contentMode: VideoCompositeContentMode) -> CGRect {
         switch contentMode {
         case .aspectFill:
             return aspectFillRect(for: imageSize, in: rect)
