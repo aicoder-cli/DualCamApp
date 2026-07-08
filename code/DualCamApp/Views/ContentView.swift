@@ -8,7 +8,7 @@
 import SwiftUI
 
 // MARK: - 设计令牌
-enum Design {
+private enum Design {
     static let background = Color(red: 0.02, green: 0.024, blue: 0.032)
     static let panel = Color.white.opacity(0.09)
     static let panelStroke = Color.white.opacity(0.14)
@@ -101,8 +101,6 @@ struct ContentView: View {
     @AppStorage(SettingsKey.lastRearFocalLength) private var lastRearFocalLength: Double = 1.0
     @AppStorage(SettingsKey.hasChosenRearFocalLength) private var hasChosenRearFocalLength = false
     @AppStorage(SettingsKey.autoClearCache) private var autoClearCache = false
-    @StateObject private var teleprompterManager = TeleprompterManager()
-    @State private var showScriptEditor = false
 
     private var isVideoRecording: Bool {
         captureMode == .video && videoRecorder.recordingState == .recording
@@ -168,34 +166,13 @@ struct ContentView: View {
 
                 cameraChromeGradients
 
-                if teleprompterManager.showTeleprompter {
-                    TeleprompterView(
-                        manager: teleprompterManager,
-                        screenWidth: geometry.size.width,
-                        screenHeight: geometry.size.height
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                    .zIndex(3)
-                }
-
                 VStack(spacing: 0) {
                     DemoHeader(
                         isReady: cameraManager.isSessionRunning,
                         isRecording: isVideoRecording,
                         showsModeSwitch: showsRecordingChrome,
                         captureMode: $captureMode,
-                        showSettings: $showSettings,
-                        hasScript: teleprompterManager.currentScript != nil,
-                        isTeleprompterVisible: teleprompterManager.showTeleprompter,
-                        onTeleprompter: {
-                            if teleprompterManager.currentScript == nil {
-                                showScriptEditor = true
-                            } else {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    teleprompterManager.showTeleprompter.toggle()
-                                }
-                            }
-                        }
+                        showSettings: $showSettings
                     )
                     .padding(.horizontal, 20)
                     .padding(.top, 54)
@@ -414,9 +391,6 @@ struct ContentView: View {
         .onChange(of: showCustomizePanel) { isPresented in
             if isPresented { cancelCountdown() }
         }
-        .onChange(of: showScriptEditor) { isPresented in
-            if isPresented { cancelCountdown() }
-        }
         .onChange(of: scenePhase) { newPhase in
             switch newPhase {
             case .active:
@@ -454,9 +428,6 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $showWorks) {
             WorksView(manager: worksManager)
-        }
-        .sheet(isPresented: $showScriptEditor) {
-            ScriptEditorView(teleprompterManager: teleprompterManager)
         }
     }
 
@@ -1079,9 +1050,6 @@ private struct DemoHeader: View {
     let showsModeSwitch: Bool
     @Binding var captureMode: CaptureMode
     @Binding var showSettings: Bool
-    let hasScript: Bool
-    let isTeleprompterVisible: Bool
-    let onTeleprompter: () -> Void
 
     private var statusKey: LocalizedStringKey {
         if isRecording { return "status.recording" }
@@ -1119,15 +1087,6 @@ private struct DemoHeader: View {
                     .opacity(isRecording ? 0.72 : 1)
                     .allowsHitTesting(!isRecording)
                     .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
-            Button(action: { onTeleprompter() }) {
-                Image(systemName: hasScript ? (isTeleprompterVisible ? "text.bubble.fill" : "text.bubble") : "text.badge.plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(isTeleprompterVisible ? Design.accent : .white)
-                    .frame(width: 42, height: 42)
-                    .background(Circle().fill(.ultraThinMaterial).environment(\.colorScheme, .dark))
-                    .overlay(Circle().stroke(Design.panelStroke, lineWidth: 0.8))
             }
 
             Button(action: { showSettings = true }) {
